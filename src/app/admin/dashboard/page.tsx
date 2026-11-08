@@ -74,7 +74,7 @@ mt-1
           </p>
         </div>
 
-        <button
+        {/* <button
           className="
 bg-black
 text-white
@@ -85,7 +85,7 @@ hover:bg-gray-800
 "
         >
           + New Order
-        </button>
+        </button> */}
       </div>
 
       {/* STAT CARDS */}
