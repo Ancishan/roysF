@@ -1,3 +1,4 @@
+
 "use client";
 
 import { use, useEffect, useState } from "react";
@@ -16,6 +17,10 @@ import {
 
 import { useCart } from "@/context/CartContext";
 import { useWishlist } from "@/context/WishlistContext";
+
+// =========================
+// INTERFACES
+// =========================
 
 interface ProductImage {
   id: string;
@@ -105,9 +110,28 @@ interface OrderResponse {
   data: CreatedOrder;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+interface StoreSettings {
+  deliveryCharge: number;
+}
 
-const DELIVERY_CHARGE = 110;
+interface SettingsResponse {
+  success: boolean;
+  message: string;
+  data: StoreSettings;
+}
+
+// =========================
+// CONSTANTS
+// =========================
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+const DEFAULT_DELIVERY_CHARGE = 110;
+
+// =========================
+// PRODUCT DETAILS PAGE
+// =========================
 
 export default function ProductDetailsPage({
   params,
@@ -120,6 +144,10 @@ export default function ProductDetailsPage({
 
   const { addItem: addToWishlist, wishlist } = useWishlist();
 
+  // =========================
+  // PRODUCT STATES
+  // =========================
+
   const [product, setProduct] = useState<Product | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -127,6 +155,14 @@ export default function ProductDetailsPage({
 
   const [quantity, setQuantity] = useState(1);
   const [selectedImage, setSelectedImage] = useState(0);
+
+  // =========================
+  // STORE SETTINGS
+  // =========================
+
+  const [storeSettings, setStoreSettings] = useState<StoreSettings>({
+    deliveryCharge: DEFAULT_DELIVERY_CHARGE,
+  });
 
   // =========================
   // ORDER STATES
@@ -144,7 +180,8 @@ export default function ProductDetailsPage({
   const [orderSubmitting, setOrderSubmitting] = useState(false);
   const [orderError, setOrderError] = useState("");
 
-  const [orderSuccess, setOrderSuccess] = useState<CreatedOrder | null>(null);
+  const [orderSuccess, setOrderSuccess] =
+    useState<CreatedOrder | null>(null);
 
   // =========================
   // REVIEW STATES
@@ -166,7 +203,9 @@ export default function ProductDetailsPage({
   // WISHLIST
   // =========================
 
-  const isWishlisted = wishlist.some((item) => item.productId === id);
+  const isWishlisted = wishlist.some(
+    (item) => item.productId === id,
+  );
 
   // =========================
   // FETCH PRODUCT
@@ -180,19 +219,29 @@ export default function ProductDetailsPage({
         setLoading(true);
         setError("");
 
-        const response = await fetch(`${API_URL}/api/products/${id}`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `${API_URL}/api/products/${id}`,
+          {
+            signal: controller.signal,
+          },
+        );
 
         const result: ApiResponse = await response.json();
 
         if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load product");
+          throw new Error(
+            result.message || "Failed to load product",
+          );
         }
 
         setProduct(result.data);
+        setSelectedImage(0);
+        setQuantity(1);
       } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") {
+        if (
+          err instanceof Error &&
+          err.name !== "AbortError"
+        ) {
           setError(err.message);
         }
       } finally {
@@ -208,6 +257,54 @@ export default function ProductDetailsPage({
   }, [id]);
 
   // =========================
+  // FETCH STORE SETTINGS
+  // =========================
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchSettings() {
+      try {
+        const response = await fetch(
+          `${API_URL}/api/settings`,
+          {
+            signal: controller.signal,
+          },
+        );
+
+        const result: SettingsResponse = await response.json();
+
+        if (!response.ok || !result.success) {
+          throw new Error(
+            result.message || "Failed to load store settings",
+          );
+        }
+
+        setStoreSettings({
+          deliveryCharge: Math.max(
+            0,
+            Number(
+              result.data.deliveryCharge ??
+                DEFAULT_DELIVERY_CHARGE,
+            ),
+          ),
+        });
+      } catch (err) {
+        if (
+          err instanceof Error &&
+          err.name !== "AbortError"
+        ) {
+          console.error("Settings fetch error:", err);
+        }
+      }
+    }
+
+    fetchSettings();
+
+    return () => controller.abort();
+  }, []);
+
+  // =========================
   // FETCH REVIEWS
   // =========================
 
@@ -218,23 +315,32 @@ export default function ProductDetailsPage({
       try {
         setReviewsLoading(true);
 
-        const response = await fetch(`${API_URL}/api/reviews`, {
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `${API_URL}/api/reviews`,
+          {
+            signal: controller.signal,
+          },
+        );
 
         const result: ReviewsResponse = await response.json();
 
         if (!response.ok || !result.success) {
-          throw new Error(result.message || "Failed to load reviews");
+          throw new Error(
+            result.message || "Failed to load reviews",
+          );
         }
 
         const productReviews = result.data.filter(
-          (review) => review.productId === id && review.isApproved,
+          (review) =>
+            review.productId === id && review.isApproved,
         );
 
         setReviews(productReviews);
       } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") {
+        if (
+          err instanceof Error &&
+          err.name !== "AbortError"
+        ) {
           console.error("Review fetch error:", err);
         }
       } finally {
@@ -333,10 +439,13 @@ export default function ProductDetailsPage({
       : regularPrice;
 
   const hasDiscount =
-    product.discountPrice !== null && sellingPrice < regularPrice;
+    product.discountPrice !== null &&
+    sellingPrice < regularPrice;
 
   const discountPercentage = hasDiscount
-    ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
+    ? Math.round(
+        ((regularPrice - sellingPrice) / regularPrice) * 100,
+      )
     : 0;
 
   const currentImage = product.images[selectedImage];
@@ -347,7 +456,12 @@ export default function ProductDetailsPage({
 
   const orderSubtotal = sellingPrice * quantity;
 
-  const orderTotal = orderSubtotal + DELIVERY_CHARGE;
+  // Always use Admin Settings delivery charge.
+  // No free shipping threshold.
+
+  const deliveryCharge = storeSettings.deliveryCharge;
+
+  const orderTotal = orderSubtotal + deliveryCharge;
 
   // =========================
   // REVIEW CALCULATIONS
@@ -357,10 +471,14 @@ export default function ProductDetailsPage({
 
   const averageRating =
     totalReviews > 0
-      ? reviews.reduce((sum, review) => sum + review.rating, 0) / totalReviews
+      ? reviews.reduce(
+          (sum, review) => sum + review.rating,
+          0,
+        ) / totalReviews
       : 0;
 
-  const roundedAverageRating = Math.round(averageRating * 10) / 10;
+  const roundedAverageRating =
+    Math.round(averageRating * 10) / 10;
 
   // =========================
   // BUY NOW
@@ -388,19 +506,25 @@ export default function ProductDetailsPage({
   // SUBMIT ORDER
   // =========================
 
-  async function handleSubmitOrder(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmitOrder(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setOrderError("");
     setOrderSuccess(null);
 
     if (customerName.trim().length < 2) {
-      setOrderError("Customer name must be at least 2 characters.");
+      setOrderError(
+        "Customer name must be at least 2 characters.",
+      );
       return;
     }
 
     if (customerPhone.trim().length < 11) {
-      setOrderError("Customer phone must be at least 11 characters.");
+      setOrderError(
+        "Customer phone must be at least 11 characters.",
+      );
       return;
     }
 
@@ -415,39 +539,47 @@ export default function ProductDetailsPage({
     }
 
     if (product.stock < 1 || quantity > product.stock) {
-      setOrderError("Sorry, the requested quantity is no longer available.");
+      setOrderError(
+        "Sorry, the requested quantity is no longer available.",
+      );
       return;
     }
 
     try {
       setOrderSubmitting(true);
 
-      const response = await fetch(`${API_URL}/api/orders`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${API_URL}/api/orders`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            customerEmail:
+              customerEmail.trim() || undefined,
+            shippingAddress: shippingAddress.trim(),
+            city: city.trim(),
+            area: area.trim() || undefined,
+            paymentMethod: "COD",
+            items: [
+              {
+                productId: product.id,
+                quantity,
+              },
+            ],
+          }),
         },
-        body: JSON.stringify({
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim(),
-          customerEmail: customerEmail.trim() || undefined,
-          shippingAddress: shippingAddress.trim(),
-          city: city.trim(),
-          area: area.trim() || undefined,
-          paymentMethod: "COD",
-          items: [
-            {
-              productId: product.id,
-              quantity,
-            },
-          ],
-        }),
-      });
+      );
 
       const result: OrderResponse = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to place order.");
+        throw new Error(
+          result.message || "Failed to place order.",
+        );
       }
 
       // Clear cart after successful order
@@ -458,7 +590,9 @@ export default function ProductDetailsPage({
       if (err instanceof Error) {
         setOrderError(err.message);
       } else {
-        setOrderError("Something went wrong. Please try again.");
+        setOrderError(
+          "Something went wrong. Please try again.",
+        );
       }
     } finally {
       setOrderSubmitting(false);
@@ -469,7 +603,9 @@ export default function ProductDetailsPage({
   // SUBMIT REVIEW
   // =========================
 
-  async function handleSubmitReview(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmitReview(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
 
     setReviewMessage("");
@@ -488,24 +624,29 @@ export default function ProductDetailsPage({
     try {
       setReviewSubmitting(true);
 
-      const response = await fetch(`${API_URL}/api/reviews`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      const response = await fetch(
+        `${API_URL}/api/reviews`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            productId: product.id,
+            name: reviewName.trim(),
+            email: reviewEmail.trim() || undefined,
+            rating: Number(reviewRating),
+            comment: reviewComment.trim(),
+          }),
         },
-        body: JSON.stringify({
-          productId: product.id,
-          name: reviewName.trim(),
-          email: reviewEmail.trim() || undefined,
-          rating: Number(reviewRating),
-          comment: reviewComment.trim(),
-        }),
-      });
+      );
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        throw new Error(result.message || "Failed to submit review");
+        throw new Error(
+          result.message || "Failed to submit review",
+        );
       }
 
       setReviewMessage(
@@ -520,7 +661,9 @@ export default function ProductDetailsPage({
       if (err instanceof Error) {
         setReviewError(err.message);
       } else {
-        setReviewError("Something went wrong. Please try again.");
+        setReviewError(
+          "Something went wrong. Please try again.",
+        );
       }
     } finally {
       setReviewSubmitting(false);
@@ -551,7 +694,9 @@ export default function ProductDetailsPage({
 
           <span>/</span>
 
-          <span className="text-gray-800">{product.name}</span>
+          <span className="text-gray-800">
+            {product.name}
+          </span>
         </div>
       </div>
 
@@ -588,9 +733,14 @@ export default function ProductDetailsPage({
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center text-gray-400">
-                  <ShoppingBag size={54} strokeWidth={1.2} />
+                  <ShoppingBag
+                    size={54}
+                    strokeWidth={1.2}
+                  />
 
-                  <p className="mt-3 text-sm">Product image coming soon</p>
+                  <p className="mt-3 text-sm">
+                    Product image coming soon
+                  </p>
                 </div>
               )}
             </div>
@@ -653,7 +803,9 @@ export default function ProductDetailsPage({
               <span className="text-sm text-gray-500">
                 {totalReviews > 0
                   ? `${roundedAverageRating} (${totalReviews} ${
-                      totalReviews === 1 ? "review" : "reviews"
+                      totalReviews === 1
+                        ? "review"
+                        : "reviews"
                     })`
                   : "No reviews yet"}
               </span>
@@ -713,9 +865,13 @@ export default function ProductDetailsPage({
 
             <div className="mt-6 flex items-center justify-between">
               {product.stock > 0 ? (
-                <p className="text-sm font-medium text-green-600">In Stock</p>
+                <p className="text-sm font-medium text-green-600">
+                  In Stock
+                </p>
               ) : (
-                <p className="text-sm font-medium text-red-600">Out of Stock</p>
+                <p className="text-sm font-medium text-red-600">
+                  Out of Stock
+                </p>
               )}
 
               {product.stock > 0 && (
@@ -737,7 +893,9 @@ export default function ProductDetailsPage({
                   <button
                     type="button"
                     onClick={() => {
-                      setQuantity((current) => Math.max(1, current - 1));
+                      setQuantity((current) =>
+                        Math.max(1, current - 1),
+                      );
                     }}
                     aria-label="Decrease quantity"
                     className="flex h-12 w-12 items-center justify-center text-gray-600 hover:text-[#7f1d2d]"
@@ -782,7 +940,9 @@ export default function ProductDetailsPage({
                 type="button"
                 onClick={handleWishlistClick}
                 aria-label={
-                  isWishlisted ? "Already in wishlist" : "Add to wishlist"
+                  isWishlisted
+                    ? "Already in wishlist"
+                    : "Add to wishlist"
                 }
                 aria-pressed={isWishlisted}
                 className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-700 transition hover:border-[#7f1d2d] hover:text-[#7f1d2d]"
@@ -790,8 +950,12 @@ export default function ProductDetailsPage({
                 <Heart
                   size={20}
                   strokeWidth={1.7}
-                  fill={isWishlisted ? "#7f1d2d" : "none"}
-                  color={isWishlisted ? "#7f1d2d" : "currentColor"}
+                  fill={
+                    isWishlisted ? "#7f1d2d" : "none"
+                  }
+                  color={
+                    isWishlisted ? "#7f1d2d" : "currentColor"
+                  }
                 />
               </button>
             </div>
@@ -801,7 +965,9 @@ export default function ProductDetailsPage({
             <div className="mt-8 border-t border-gray-100">
               {product.material && (
                 <div className="flex justify-between gap-4 border-b border-gray-100 py-4 text-sm">
-                  <span className="text-gray-500">Material</span>
+                  <span className="text-gray-500">
+                    Material
+                  </span>
 
                   <span className="text-right font-medium text-gray-800">
                     {product.material}
@@ -811,7 +977,9 @@ export default function ProductDetailsPage({
 
               {product.weight && (
                 <div className="flex justify-between gap-4 border-b border-gray-100 py-4 text-sm">
-                  <span className="text-gray-500">Weight</span>
+                  <span className="text-gray-500">
+                    Weight
+                  </span>
 
                   <span className="text-right font-medium text-gray-800">
                     {product.weight} g
@@ -821,7 +989,9 @@ export default function ProductDetailsPage({
 
               {product.warranty && (
                 <div className="flex justify-between gap-4 border-b border-gray-100 py-4 text-sm">
-                  <span className="text-gray-500">Warranty</span>
+                  <span className="text-gray-500">
+                    Warranty
+                  </span>
 
                   <span className="text-right font-medium text-gray-800">
                     {product.warranty}
@@ -865,7 +1035,9 @@ export default function ProductDetailsPage({
                 <div className="flex items-center gap-5">
                   <div className="text-center">
                     <p className="text-4xl font-bold text-gray-900">
-                      {totalReviews > 0 ? roundedAverageRating : "0.0"}
+                      {totalReviews > 0
+                        ? roundedAverageRating
+                        : "0.0"}
                     </p>
 
                     <div className="mt-2 flex justify-center gap-0.5">
@@ -911,7 +1083,10 @@ export default function ProductDetailsPage({
                   Share your experience with this product.
                 </p>
 
-                <form onSubmit={handleSubmitReview} className="mt-6 space-y-5">
+                <form
+                  onSubmit={handleSubmitReview}
+                  className="mt-6 space-y-5"
+                >
                   <div>
                     <label
                       htmlFor="reviewName"
@@ -924,7 +1099,9 @@ export default function ProductDetailsPage({
                       id="reviewName"
                       type="text"
                       value={reviewName}
-                      onChange={(e) => setReviewName(e.target.value)}
+                      onChange={(e) =>
+                        setReviewName(e.target.value)
+                      }
                       placeholder="Enter your name"
                       className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
                     />
@@ -945,7 +1122,9 @@ export default function ProductDetailsPage({
                       id="reviewEmail"
                       type="email"
                       value={reviewEmail}
-                      onChange={(e) => setReviewEmail(e.target.value)}
+                      onChange={(e) =>
+                        setReviewEmail(e.target.value)
+                      }
                       placeholder="your@email.com"
                       className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
                     />
@@ -961,7 +1140,9 @@ export default function ProductDetailsPage({
                         <button
                           key={star}
                           type="button"
-                          onClick={() => setReviewRating(star)}
+                          onClick={() =>
+                            setReviewRating(star)
+                          }
                           aria-label={`Rate ${star} stars`}
                           className="transition hover:scale-110"
                         >
@@ -989,7 +1170,9 @@ export default function ProductDetailsPage({
                     <textarea
                       id="reviewComment"
                       value={reviewComment}
-                      onChange={(e) => setReviewComment(e.target.value)}
+                      onChange={(e) =>
+                        setReviewComment(e.target.value)
+                      }
                       placeholder="Write your review..."
                       rows={5}
                       className="w-full resize-none rounded-xl border border-gray-200 px-4 py-3 text-sm outline-none transition focus:border-[#7f1d2d]"
@@ -1013,7 +1196,9 @@ export default function ProductDetailsPage({
                     disabled={reviewSubmitting}
                     className="h-12 rounded-full bg-[#7f1d2d] px-7 text-sm font-semibold text-white transition hover:bg-[#681725] disabled:cursor-not-allowed disabled:bg-gray-300"
                   >
-                    {reviewSubmitting ? "Submitting..." : "Submit Review"}
+                    {reviewSubmitting
+                      ? "Submitting..."
+                      : "Submit Review"}
                   </button>
                 </form>
               </div>
@@ -1023,11 +1208,16 @@ export default function ProductDetailsPage({
 
             <div>
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold text-gray-900">Reviews</h3>
+                <h3 className="text-lg font-semibold text-gray-900">
+                  Reviews
+                </h3>
 
                 {totalReviews > 0 && (
                   <span className="text-sm text-gray-500">
-                    {totalReviews} {totalReviews === 1 ? "review" : "reviews"}
+                    {totalReviews}{" "}
+                    {totalReviews === 1
+                      ? "review"
+                      : "reviews"}
                   </span>
                 )}
               </div>
@@ -1087,14 +1277,13 @@ export default function ProductDetailsPage({
                           </p>
 
                           <p className="mt-1 text-xs text-gray-400">
-                            {new Date(review.createdAt).toLocaleDateString(
-                              "en-BD",
-                              {
-                                year: "numeric",
-                                month: "long",
-                                day: "numeric",
-                              },
-                            )}
+                            {new Date(
+                              review.createdAt,
+                            ).toLocaleDateString("en-BD", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
                           </p>
                         </div>
 
@@ -1179,7 +1368,10 @@ export default function ProductDetailsPage({
                         />
                       ) : (
                         <div className="flex h-full items-center justify-center">
-                          <ShoppingBag size={25} className="text-gray-300" />
+                          <ShoppingBag
+                            size={25}
+                            className="text-gray-300"
+                          />
                         </div>
                       )}
                     </div>
@@ -1201,7 +1393,9 @@ export default function ProductDetailsPage({
 
                   <div className="mt-5 space-y-3 border-t border-gray-200 pt-5 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Subtotal</span>
+                      <span className="text-gray-500">
+                        Subtotal
+                      </span>
 
                       <span className="font-medium text-gray-800">
                         ৳{orderSubtotal.toLocaleString("en-BD")}
@@ -1209,15 +1403,19 @@ export default function ProductDetailsPage({
                     </div>
 
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Delivery Charge</span>
+                      <span className="text-gray-500">
+                        Delivery Charge
+                      </span>
 
                       <span className="font-medium text-gray-800">
-                        ৳{DELIVERY_CHARGE.toLocaleString("en-BD")}
+                        ৳{deliveryCharge.toLocaleString("en-BD")}
                       </span>
                     </div>
 
                     <div className="flex justify-between border-t border-gray-200 pt-3">
-                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        Total
+                      </span>
 
                       <span className="text-lg font-bold text-[#7f1d2d]">
                         ৳{orderTotal.toLocaleString("en-BD")}
@@ -1228,7 +1426,10 @@ export default function ProductDetailsPage({
 
                 {/* FORM */}
 
-                <form onSubmit={handleSubmitOrder} className="mt-7 space-y-5">
+                <form
+                  onSubmit={handleSubmitOrder}
+                  className="mt-7 space-y-5"
+                >
                   {/* NAME */}
 
                   <div>
@@ -1243,7 +1444,9 @@ export default function ProductDetailsPage({
                       id="customerName"
                       type="text"
                       value={customerName}
-                      onChange={(e) => setCustomerName(e.target.value)}
+                      onChange={(e) =>
+                        setCustomerName(e.target.value)
+                      }
                       placeholder="Enter your full name"
                       required
                       className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
@@ -1264,7 +1467,9 @@ export default function ProductDetailsPage({
                       id="customerPhone"
                       type="tel"
                       value={customerPhone}
-                      onChange={(e) => setCustomerPhone(e.target.value)}
+                      onChange={(e) =>
+                        setCustomerPhone(e.target.value)
+                      }
                       placeholder="01XXXXXXXXX"
                       required
                       className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
@@ -1288,7 +1493,9 @@ export default function ProductDetailsPage({
                       id="customerEmail"
                       type="email"
                       value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      onChange={(e) =>
+                        setCustomerEmail(e.target.value)
+                      }
                       placeholder="your@email.com"
                       className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
                     />
@@ -1309,7 +1516,9 @@ export default function ProductDetailsPage({
                         id="city"
                         type="text"
                         value={city}
-                        onChange={(e) => setCity(e.target.value)}
+                        onChange={(e) =>
+                          setCity(e.target.value)
+                        }
                         placeholder="Chattogram"
                         required
                         className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
@@ -1331,7 +1540,9 @@ export default function ProductDetailsPage({
                         id="area"
                         type="text"
                         value={area}
-                        onChange={(e) => setArea(e.target.value)}
+                        onChange={(e) =>
+                          setArea(e.target.value)
+                        }
                         placeholder="Your area"
                         className="h-12 w-full rounded-xl border border-gray-200 px-4 text-sm outline-none transition focus:border-[#7f1d2d]"
                       />
@@ -1351,7 +1562,9 @@ export default function ProductDetailsPage({
                     <textarea
                       id="shippingAddress"
                       value={shippingAddress}
-                      onChange={(e) => setShippingAddress(e.target.value)}
+                      onChange={(e) =>
+                        setShippingAddress(e.target.value)
+                      }
                       placeholder="House/Road/Block and other delivery details"
                       required
                       rows={4}
@@ -1403,7 +1616,8 @@ export default function ProductDetailsPage({
                     ) : (
                       <>
                         <ShoppingBag size={18} />
-                        Place Order — ৳{orderTotal.toLocaleString("en-BD")}
+                        Place Order — ৳
+                        {orderTotal.toLocaleString("en-BD")}
                       </>
                     )}
                   </button>
@@ -1416,7 +1630,10 @@ export default function ProductDetailsPage({
 
               <div className="px-6 py-12 text-center sm:px-10">
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-green-50">
-                  <CheckCircle2 size={44} className="text-green-600" />
+                  <CheckCircle2
+                    size={44}
+                    className="text-green-600"
+                  />
                 </div>
 
                 <h2 className="mt-6 text-2xl font-bold text-gray-900">
@@ -1430,7 +1647,9 @@ export default function ProductDetailsPage({
                 <div className="mx-auto mt-7 max-w-md rounded-2xl bg-gray-50 p-6 text-left">
                   <div className="space-y-4 text-sm">
                     <div className="flex justify-between gap-4">
-                      <span className="text-gray-500">Order Number</span>
+                      <span className="text-gray-500">
+                        Order Number
+                      </span>
 
                       <span className="font-bold text-[#7f1d2d]">
                         {orderSuccess.orderNumber}
@@ -1438,7 +1657,9 @@ export default function ProductDetailsPage({
                     </div>
 
                     <div className="flex justify-between gap-4">
-                      <span className="text-gray-500">Customer</span>
+                      <span className="text-gray-500">
+                        Customer
+                      </span>
 
                       <span className="font-medium text-gray-800">
                         {orderSuccess.customerName}
@@ -1446,7 +1667,9 @@ export default function ProductDetailsPage({
                     </div>
 
                     <div className="flex justify-between gap-4">
-                      <span className="text-gray-500">Payment</span>
+                      <span className="text-gray-500">
+                        Payment
+                      </span>
 
                       <span className="font-medium text-gray-800">
                         Cash on Delivery
@@ -1454,13 +1677,15 @@ export default function ProductDetailsPage({
                     </div>
 
                     <div className="flex justify-between gap-4 border-t border-gray-200 pt-4">
-                      <span className="font-semibold text-gray-900">Total</span>
+                      <span className="font-semibold text-gray-900">
+                        Total
+                      </span>
 
                       <span className="text-lg font-bold text-[#7f1d2d]">
                         ৳
-                        {Number(orderSuccess.totalAmount).toLocaleString(
-                          "en-BD",
-                        )}
+                        {Number(
+                          orderSuccess.totalAmount,
+                        ).toLocaleString("en-BD")}
                       </span>
                     </div>
                   </div>

@@ -1,204 +1,415 @@
+
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
 import {
   Mail,
   Phone,
   MapPin,
 } from "lucide-react";
 
-const quickLinks = [
-  { name: "Home", href: "/" },
-  { name: "Shop", href: "/shop" },
-  { name: "About Us", href: "/about" },
-  { name: "Blog", href: "/blog" },
-  { name: "Contact", href: "/contact" },
-];
+import {
+  FaFacebookF,
+  FaInstagram,
+  FaYoutube,
+  FaTiktok,
+} from "react-icons/fa";
 
-const customerLinks = [
-  { name: "My Account", href: "/account" },
-  { name: "Wishlist", href: "/wishlist" },
-  { name: "Cart", href: "/cart" },
-  { name: "Shipping Policy", href: "/shipping" },
-  { name: "Return Policy", href: "/returns" },
-];
+// =====================================
+// API URL
+// =====================================
+
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
+// =====================================
+// TYPES
+// =====================================
+
+interface StoreSettings {
+  storeName: string;
+  storeEmail: string;
+  storePhone: string;
+  storeAddress: string;
+
+  facebookUrl: string;
+  instagramUrl: string;
+  youtubeUrl: string;
+  tiktokUrl: string;
+}
+
+// =====================================
+// DEFAULT SETTINGS
+// =====================================
+
+const defaultSettings: StoreSettings = {
+  storeName: "ROYS",
+  storeEmail: "info@roys.com",
+  storePhone: "+880 0000 000000",
+  storeAddress: "Chattogram, Bangladesh",
+
+  facebookUrl: "",
+  instagramUrl: "",
+  youtubeUrl: "",
+  tiktokUrl: "",
+};
+
+// =====================================
+// FOOTER COMPONENT
+// =====================================
 
 export default function Footer() {
+  const [settings, setSettings] =
+    useState<StoreSettings>(defaultSettings);
+
+  // =====================================
+  // FETCH PUBLIC SETTINGS
+  // =====================================
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch(
+          `${API_URL}/api/settings/public`,
+          {
+            method: "GET",
+            cache: "no-store",
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(
+            `Failed to fetch public settings: ${response.status}`
+          );
+        }
+
+        const result = await response.json();
+
+        console.log("Footer API Response:", result);
+
+        if (isMounted && result.success && result.data) {
+          setSettings({
+            ...defaultSettings,
+            ...result.data,
+          });
+        }
+      } catch (error) {
+        console.error("Footer settings error:", error);
+      }
+    };
+
+    fetchSettings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // =====================================
+  // SOCIAL MEDIA LINKS
+  // =====================================
+
+  const socialLinks = [
+    {
+      name: "Facebook",
+      url: settings.facebookUrl,
+      icon: FaFacebookF,
+    },
+    {
+      name: "Instagram",
+      url: settings.instagramUrl,
+      icon: FaInstagram,
+    },
+    {
+      name: "YouTube",
+      url: settings.youtubeUrl,
+      icon: FaYoutube,
+    },
+    {
+      name: "TikTok",
+      url: settings.tiktokUrl,
+      icon: FaTiktok,
+    },
+  ];
+
+  // =====================================
+  // CONTACT INFORMATION
+  // =====================================
+
+  const phone = settings.storePhone;
+  const email = settings.storeEmail;
+
+  const phoneLink = phone.replace(/[^\d+]/g, "");
+
+  // =====================================
+  // UI
+  // =====================================
+
   return (
-    <footer className="bg-[#111827] text-white">
+    <footer className="bg-[#111111] text-white">
 
-      {/* Main Footer */}
-      <div className="mx-auto max-w-7xl px-5 py-16 lg:px-8">
-        <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-4">
+      {/* MAIN FOOTER */}
 
-          {/* Brand */}
+      <div className="mx-auto max-w-7xl px-5 py-14 md:px-8">
+
+        <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 lg:grid-cols-4">
+
+          {/* BRAND SECTION */}
+
           <div>
+
             <Link
               href="/"
-              className="text-3xl font-extrabold tracking-[0.18em]"
+              className="inline-block text-3xl font-bold tracking-wider text-white"
             >
-              ROYS
+              {settings.storeName || "ROYS"}
+              <span className="text-[#7f1d2d]">.</span>
             </Link>
 
             <p className="mt-5 max-w-xs text-sm leading-7 text-gray-400">
-              More than just a brand. Discover premium products,
-              timeless style and a shopping experience made for you.
+              Discover quality products with a better shopping
+              experience. Thank you for choosing{" "}
+              {settings.storeName || "ROYS"}.
             </p>
 
-            {/* Social Links */}
-            <div className="mt-6 flex items-center gap-3">
+            {/* SOCIAL MEDIA */}
 
-              <a
-                href="#"
-                aria-label="Facebook"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-700 text-sm font-semibold text-gray-400 transition hover:border-white hover:text-white"
-              >
-                f
-              </a>
+            <div className="mt-6">
 
-              <a
-                href="#"
-                aria-label="Instagram"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-700 text-sm font-semibold text-gray-400 transition hover:border-white hover:text-white"
-              >
-                ig
-              </a>
+              <h3 className="mb-4 text-sm font-semibold uppercase tracking-wider">
+                Follow Us
+              </h3>
 
-              <a
-                href="#"
-                aria-label="Twitter"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-700 text-sm font-semibold text-gray-400 transition hover:border-white hover:text-white"
-              >
-                𝕏
-              </a>
+              <div className="flex items-center gap-3">
 
-              <a
-                href="#"
-                aria-label="LinkedIn"
-                className="flex h-9 w-9 items-center justify-center rounded-full border border-gray-700 text-sm font-semibold text-gray-400 transition hover:border-white hover:text-white"
-              >
-                in
-              </a>
+                {socialLinks.map((social) => {
+                  const Icon = social.icon;
+                  const url = social.url?.trim();
+                  const hasUrl = Boolean(url);
+
+                  return (
+                    <a
+                      key={social.name}
+                      href={hasUrl ? url : undefined}
+                      target={hasUrl ? "_blank" : undefined}
+                      rel={
+                        hasUrl
+                          ? "noopener noreferrer"
+                          : undefined
+                      }
+                      aria-label={social.name}
+                      title={social.name}
+                      onClick={(e) => {
+                        if (!hasUrl) {
+                          e.preventDefault();
+                        }
+                      }}
+                      className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-700 text-gray-300 transition-all duration-300 hover:border-[#7f1d2d] hover:bg-[#7f1d2d] hover:text-white"
+                    >
+                      <Icon size={18} />
+                    </a>
+                  );
+                })}
+
+              </div>
 
             </div>
+
           </div>
 
-          {/* Quick Links */}
+          {/* QUICK LINKS */}
+
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider">
+
+            <h3 className="mb-6 text-base font-semibold uppercase tracking-wider">
               Quick Links
             </h3>
 
-            <ul className="mt-5 space-y-3">
-              {quickLinks.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-gray-400 transition hover:text-white"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
+            <ul className="space-y-4 text-sm text-gray-400">
+
+              <li>
+                <Link href="/" className="transition hover:text-white">
+                  Home
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/shop" className="transition hover:text-white">
+                  Shop
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/about" className="transition hover:text-white">
+                  About Us
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/blog" className="transition hover:text-white">
+                  Blog
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/contact" className="transition hover:text-white">
+                  Contact Us
+                </Link>
+              </li>
+
             </ul>
+
           </div>
 
-          {/* Customer Service */}
+          {/* CUSTOMER SERVICE */}
+
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider">
+
+            <h3 className="mb-6 text-base font-semibold uppercase tracking-wider">
               Customer Service
             </h3>
 
-            <ul className="mt-5 space-y-3">
-              {customerLinks.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    className="text-sm text-gray-400 transition hover:text-white"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
+            <ul className="space-y-4 text-sm text-gray-400">
+
+              <li>
+                <Link href="/my-orders" className="transition hover:text-white">
+                  My Orders
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/cart" className="transition hover:text-white">
+                  Shopping Cart
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/wishlist" className="transition hover:text-white">
+                  Wishlist
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/privacy-policy" className="transition hover:text-white">
+                  Privacy Policy
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/terms" className="transition hover:text-white">
+                  Terms & Conditions
+                </Link>
+              </li>
+
             </ul>
+
           </div>
 
-          {/* Contact */}
+          {/* CONTACT INFORMATION */}
+
           <div>
-            <h3 className="text-sm font-semibold uppercase tracking-wider">
+
+            <h3 className="mb-6 text-base font-semibold uppercase tracking-wider">
               Contact Us
             </h3>
 
-            <div className="mt-5 space-y-4">
+            <ul className="space-y-5 text-sm text-gray-400">
 
-              <div className="flex gap-3">
+              {/* ADDRESS */}
+
+              <li className="flex items-start gap-3">
+
                 <MapPin
-                  size={18}
-                  className="mt-0.5 shrink-0 text-gray-400"
+                  size={19}
+                  className="mt-0.5 shrink-0 text-[#7f1d2d]"
                 />
 
-                <p className="text-sm leading-6 text-gray-400">
-                  Chattogram, Bangladesh
-                </p>
-              </div>
+                <span className="leading-6">
+                  {settings.storeAddress ||
+                    defaultSettings.storeAddress}
+                </span>
 
-              <div className="flex items-center gap-3">
+              </li>
+
+              {/* PHONE */}
+
+              <li className="flex items-center gap-3">
+
                 <Phone
-                  size={17}
-                  className="shrink-0 text-gray-400"
+                  size={18}
+                  className="shrink-0 text-[#7f1d2d]"
                 />
 
                 <a
-                  href="tel:+8800000000000"
-                  className="text-sm text-gray-400 transition hover:text-white"
+                  href={`tel:${phoneLink}`}
+                  className="transition hover:text-white"
                 >
-                  +880 0000 000000
+                  {phone || defaultSettings.storePhone}
                 </a>
-              </div>
 
-              <div className="flex items-center gap-3">
+              </li>
+
+              {/* EMAIL */}
+
+              <li className="flex items-center gap-3">
+
                 <Mail
-                  size={17}
-                  className="shrink-0 text-gray-400"
+                  size={18}
+                  className="shrink-0 text-[#7f1d2d]"
                 />
 
                 <a
-                  href="mailto:info@roys.com"
-                  className="text-sm text-gray-400 transition hover:text-white"
+                  href={`mailto:${email}`}
+                  className="break-all transition hover:text-white"
                 >
-                  info@roys.com
+                  {email || defaultSettings.storeEmail}
                 </a>
-              </div>
 
-            </div>
+              </li>
+
+            </ul>
+
           </div>
 
         </div>
+
       </div>
 
-      {/* Bottom Footer */}
-      <div className="border-t border-gray-800">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-5 py-5 text-center sm:flex-row lg:px-8 sm:text-left">
+      {/* BOTTOM FOOTER */}
 
-          <p className="text-xs text-gray-500">
-            © {new Date().getFullYear()} ROYS. All rights reserved.
+      <div className="border-t border-gray-800">
+
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-5 py-6 text-center md:flex-row md:px-8 md:text-left">
+
+          <p className="text-sm text-gray-500">
+            © {new Date().getFullYear()}{" "}
+            {settings.storeName || "ROYS"}. All rights reserved.
           </p>
 
-          <div className="flex gap-5">
+          <div className="flex items-center gap-5 text-sm text-gray-500">
+
             <Link
-              href="/privacy"
-              className="text-xs text-gray-500 transition hover:text-white"
+              href="/privacy-policy"
+              className="transition hover:text-white"
             >
               Privacy Policy
             </Link>
 
             <Link
               href="/terms"
-              className="text-xs text-gray-500 transition hover:text-white"
+              className="transition hover:text-white"
             >
               Terms & Conditions
             </Link>
+
           </div>
 
         </div>
+
       </div>
 
     </footer>

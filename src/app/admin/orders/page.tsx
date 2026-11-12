@@ -6,6 +6,7 @@ import Link from "next/link";
 import {
   Search,
   Eye,
+  Trash2,
   RefreshCw,
   ChevronLeft,
   ChevronRight,
@@ -280,6 +281,56 @@ export default function AdminOrdersPage() {
   };
 
   // ==========================================
+  // DELETE ORDER
+  // ==========================================
+
+  const handleDeleteOrder = async (orderId: string) => {
+    const order = orders.find((item) => item.id === orderId);
+
+    if (!order) return;
+
+    const confirmed = window.confirm(
+      `Are you sure you want to delete order ${order.orderNumber}?\n\nThis action cannot be undone.`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setUpdatingId(orderId);
+      setError("");
+      setSuccess("");
+
+      const response = await fetch(
+        `${API_URL}/api/orders/${orderId}`,
+        {
+          method: "DELETE",
+          headers: getHeaders(),
+          credentials: "include",
+        },
+      );
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        throw new Error(
+          result.message || "Failed to delete order",
+        );
+      }
+
+      setSuccess(
+        `Order ${order.orderNumber} deleted successfully!`,
+      );
+
+      // Database থেকে updated orders এবং stats আবার আনবে
+      await fetchOrders();
+    } catch (err: any) {
+      setError(err.message || "Failed to delete order");
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  // ==========================================
   // STATS CARDS
   // ==========================================
 
@@ -408,6 +459,7 @@ export default function AdminOrdersPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <Icon size={21} className={card.color} />
+
                   <span className="text-2xl font-bold text-gray-900">
                     {card.value}
                   </span>
@@ -628,14 +680,41 @@ export default function AdminOrdersPage() {
 
                       {/* ACTION */}
 
-                      <td className="px-5 py-4 text-center">
-                        <Link
-                          href={`/admin/orders/${order.id}`}
-                          title="View Order Details"
-                          className="inline-flex items-center justify-center rounded-lg bg-[#7f1d2d] p-2.5 text-white transition hover:bg-[#641624]"
-                        >
-                          <Eye size={17} />
-                        </Link>
+                      <td className="px-5 py-4">
+                        <div className="flex items-center justify-center gap-2">
+
+                          {/* VIEW DETAILS */}
+
+                          <Link
+                            href={`/admin/orders/${order.id}`}
+                            title="View Order Details"
+                            className="inline-flex items-center justify-center rounded-lg bg-[#7f1d2d] p-2.5 text-white transition hover:bg-[#641624]"
+                          >
+                            <Eye size={17} />
+                          </Link>
+
+                          {/* DELETE ORDER */}
+
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleDeleteOrder(order.id)
+                            }
+                            disabled={updatingId === order.id}
+                            title="Delete Order"
+                            className="inline-flex items-center justify-center rounded-lg bg-red-100 p-2.5 text-red-600 transition hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {updatingId === order.id ? (
+                              <RefreshCw
+                                size={17}
+                                className="animate-spin"
+                              />
+                            ) : (
+                              <Trash2 size={17} />
+                            )}
+                          </button>
+
+                        </div>
                       </td>
                     </tr>
                   ))

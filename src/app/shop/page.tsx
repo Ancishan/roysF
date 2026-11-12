@@ -1,7 +1,15 @@
+
 "use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+
+interface ProductImage {
+  id?: string;
+  url: string;
+  altText?: string | null;
+  isPrimary?: boolean;
+}
 
 type Product = {
   id: string;
@@ -9,11 +17,12 @@ type Product = {
   description?: string | null;
   price: number | string;
   discountPrice?: number | string | null;
-  images?: string[] | null;
+  images?: ProductImage[] | null;
   stock?: number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
 function formatPrice(value: number | string) {
   return `৳${Number(value).toLocaleString("en-BD")}`;
@@ -27,10 +36,6 @@ export default function ShopPage() {
   useEffect(() => {
     async function fetchProducts() {
       try {
-        if (!API_URL) {
-          throw new Error("NEXT_PUBLIC_API_URL পাওয়া যায়নি।");
-        }
-
         const response = await fetch(`${API_URL}/api/products`);
 
         if (!response.ok) {
@@ -81,12 +86,14 @@ export default function ShopPage() {
 
       {/* Products */}
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
+        {/* Loading */}
         {loading && (
           <div className="py-20 text-center">
             <p className="text-gray-500">Products loading...</p>
           </div>
         )}
 
+        {/* Error */}
         {!loading && error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
             <p className="text-sm text-red-700">{error}</p>
@@ -97,6 +104,7 @@ export default function ShopPage() {
           </div>
         )}
 
+        {/* Empty Products */}
         {!loading && !error && products.length === 0 && (
           <div className="rounded-lg border border-gray-200 p-10 text-center">
             <p className="font-medium text-gray-800">
@@ -105,9 +113,10 @@ export default function ShopPage() {
           </div>
         )}
 
+        {/* Product Grid */}
         {!loading && !error && products.length > 0 && (
           <>
-            {/* Product count */}
+            {/* Product Count */}
             <div className="mb-6 flex items-center justify-between">
               <p className="text-sm text-gray-500">
                 Showing{" "}
@@ -127,26 +136,31 @@ export default function ShopPage() {
 
                 const hasDiscount =
                   product.discountPrice != null &&
-                  Number(product.discountPrice) < Number(product.price);
+                  Number(product.discountPrice) <
+                    Number(product.price);
 
-                const image = product.images?.[0];
+                // Homepage-এর মতো image object থেকে URL নেওয়া
+                const image = product.images?.[0]?.url;
 
                 return (
                   <article
                     key={product.id}
-                    className="overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:shadow-lg"
+                    className="group overflow-hidden rounded-xl border border-gray-200 bg-white transition hover:-translate-y-1 hover:shadow-lg"
                   >
                     {/* Product Image */}
                     <Link
                       href={`/products/${product.id}`}
                       className="block"
                     >
-                      <div className="flex aspect-square items-center justify-center bg-gray-100">
+                      <div className="flex aspect-square items-center justify-center overflow-hidden bg-gray-100">
                         {image ? (
                           <img
                             src={image}
-                            alt={product.name}
-                            className="h-full w-full object-cover transition duration-300 hover:scale-105"
+                            alt={
+                              product.images?.[0]?.altText ||
+                              product.name
+                            }
+                            className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
                           />
                         ) : (
                           <div className="px-4 text-center text-sm text-gray-400">
@@ -164,6 +178,7 @@ export default function ShopPage() {
                         </h2>
                       </Link>
 
+                      {/* Description */}
                       {product.description && (
                         <p className="mt-2 line-clamp-2 text-sm text-gray-500">
                           {product.description}
