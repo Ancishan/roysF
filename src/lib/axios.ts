@@ -1,8 +1,7 @@
-
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "https://roysb.onrender.com",
+  baseURL: `${process.env.NEXT_PUBLIC_API_URL}`,
   withCredentials: true,
   headers: {
     "Content-Type": "application/json",
