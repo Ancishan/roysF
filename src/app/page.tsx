@@ -17,17 +17,20 @@ type Product = {
 
   discountPrice?: number | string | null;
 
-  images?: {
-    id?: string;
-    url: string;
-    altText?: string | null;
-    isPrimary?: boolean;
-  }[] | null;
+  images?:
+    | {
+        id?: string;
+        url: string;
+        altText?: string | null;
+        isPrimary?: boolean;
+      }[]
+    | null;
 
   stock?: number;
 };
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL;
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "https://roysb.onrender.com/api";
 
 function formatPrice(value: number | string) {
   return `৳${Number(value).toLocaleString("en-BD")}`;
@@ -52,7 +55,9 @@ export default function HomePage() {
           throw new Error("NEXT_PUBLIC_API_URL পাওয়া যায়নি।");
         }
 
-        const response = await fetch(`${API_URL}/api/products`);
+        const response = await fetch(`${API_URL}/products`, {
+          cache: "no-store",
+        });
 
         if (!response.ok) {
           throw new Error("Products load করা যায়নি।");
@@ -72,9 +77,7 @@ export default function HomePage() {
         setProducts(productList);
       } catch (err) {
         setError(
-          err instanceof Error
-            ? err.message
-            : "কিছু একটা সমস্যা হয়েছে।"
+          err instanceof Error ? err.message : "কিছু একটা সমস্যা হয়েছে।",
         );
       } finally {
         setLoading(false);
@@ -86,14 +89,12 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-white">
-
       {/* =====================================================
           HERO SECTION
       ====================================================== */}
 
       <section className="bg-[#f8f1f2]">
         <div className="mx-auto grid max-w-7xl items-center gap-8 px-4 py-16 sm:px-6 md:grid-cols-2 md:py-24 lg:px-8">
-
           {/* Hero Content */}
           <div>
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-[#7f1d2d]">
@@ -102,15 +103,12 @@ export default function HomePage() {
 
             <h1 className="max-w-xl text-4xl font-bold leading-tight text-gray-900 sm:text-5xl">
               Find Your Style.
-              <span className="block text-[#7f1d2d]">
-                Shop with ROYS.
-              </span>
+              <span className="block text-[#7f1d2d]">Shop with ROYS.</span>
             </h1>
 
             <p className="mt-5 max-w-lg text-base leading-7 text-gray-600">
-              Discover products picked for your everyday style.
-              Explore our latest collection and find something
-              you love.
+              Discover products picked for your everyday style. Explore our
+              latest collection and find something you love.
             </p>
 
             <Link
@@ -133,7 +131,6 @@ export default function HomePage() {
               </p>
             </div>
           </div>
-
         </div>
       </section>
 
@@ -142,10 +139,8 @@ export default function HomePage() {
       ====================================================== */}
 
       <section className="mx-auto max-w-7xl px-4 py-14 sm:px-6 lg:px-8">
-
         {/* Section Header */}
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-
           <div>
             <p className="text-sm font-semibold uppercase tracking-wider text-[#7f1d2d]">
               Our Collection
@@ -162,7 +157,6 @@ export default function HomePage() {
           >
             View All Products →
           </Link>
-
         </div>
 
         {/* =====================================================
@@ -170,9 +164,7 @@ export default function HomePage() {
         ====================================================== */}
 
         {loading && (
-          <p className="py-12 text-center text-gray-500">
-            Products loading...
-          </p>
+          <p className="py-12 text-center text-gray-500">Products loading...</p>
         )}
 
         {/* =====================================================
@@ -181,16 +173,11 @@ export default function HomePage() {
 
         {!loading && error && (
           <div className="rounded-lg border border-red-200 bg-red-50 p-5 text-center">
-
-            <p className="text-sm text-red-700">
-              {error}
-            </p>
+            <p className="text-sm text-red-700">{error}</p>
 
             <p className="mt-2 text-xs text-red-600">
-              Backend server চালু আছে কি না এবং API URL ঠিক আছে
-              কি না দেখো।
+              Backend server চালু আছে কি না এবং API URL ঠিক আছে কি না দেখো।
             </p>
-
           </div>
         )}
 
@@ -200,7 +187,6 @@ export default function HomePage() {
 
         {!loading && !error && products.length === 0 && (
           <div className="rounded-lg border border-gray-200 p-10 text-center">
-
             <p className="font-medium text-gray-800">
               এখনো কোনো product পাওয়া যায়নি।
             </p>
@@ -208,7 +194,6 @@ export default function HomePage() {
             <p className="mt-2 text-sm text-gray-500">
               Prisma Studio থেকে Product table-এ product যোগ করো।
             </p>
-
           </div>
         )}
 
@@ -218,9 +203,7 @@ export default function HomePage() {
 
         {!loading && !error && products.length > 0 && (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-
             {products.map((product) => {
-
               const sellingPrice =
                 product.discountPrice != null
                   ? product.discountPrice
@@ -228,14 +211,13 @@ export default function HomePage() {
 
               const hasDiscount =
                 product.discountPrice != null &&
-                Number(product.discountPrice) <
-                  Number(product.price);
+                Number(product.discountPrice) < Number(product.price);
 
               const image = product.images?.[0]?.url;
 
               // Check wishlist status
               const isWishlisted = wishlist.some(
-                (item) => item.productId === product.id
+                (item) => item.productId === product.id,
               );
 
               return (
@@ -243,13 +225,11 @@ export default function HomePage() {
                   key={product.id}
                   className="group overflow-hidden rounded-xl border border-gray-200 bg-white transition duration-300 hover:-translate-y-1 hover:shadow-lg"
                 >
-
                   {/* =================================================
                       PRODUCT IMAGE
                   ================================================== */}
 
                   <div className="relative aspect-square overflow-hidden bg-gray-100">
-
                     {/* Image */}
                     <Link
                       href={`/products/${product.id}`}
@@ -299,11 +279,7 @@ export default function HomePage() {
                       <Heart
                         size={20}
                         strokeWidth={1.8}
-                        fill={
-                          isWishlisted
-                            ? "#7f1d2d"
-                            : "none"
-                        }
+                        fill={isWishlisted ? "#7f1d2d" : "none"}
                       />
                     </button>
 
@@ -313,7 +289,6 @@ export default function HomePage() {
                         Sale
                       </span>
                     )}
-
                   </div>
 
                   {/* =================================================
@@ -321,11 +296,8 @@ export default function HomePage() {
                   ================================================== */}
 
                   <div className="p-4">
-
                     {/* Product Name */}
-                    <Link
-                      href={`/products/${product.id}`}
-                    >
+                    <Link href={`/products/${product.id}`}>
                       <h3 className="line-clamp-2 min-h-12 font-semibold text-gray-900 transition hover:text-[#7f1d2d]">
                         {product.name}
                       </h3>
@@ -340,7 +312,6 @@ export default function HomePage() {
 
                     {/* Price */}
                     <div className="mt-4 flex flex-wrap items-center gap-2">
-
                       <span className="text-lg font-bold text-[#7f1d2d]">
                         {formatPrice(sellingPrice)}
                       </span>
@@ -350,9 +321,7 @@ export default function HomePage() {
                           {formatPrice(product.price)}
                         </span>
                       )}
-
                     </div>
-
                   </div>
 
                   {/* =================================================
@@ -360,25 +329,19 @@ export default function HomePage() {
                   ================================================== */}
 
                   <div className="px-4 pb-4">
-
                     <Link
                       href={`/products/${product.id}`}
                       className="block rounded-md border border-[#7f1d2d] px-4 py-2.5 text-center text-sm font-semibold text-[#7f1d2d] transition hover:bg-[#7f1d2d] hover:text-white"
                     >
                       View Details
                     </Link>
-
                   </div>
-
                 </article>
               );
             })}
-
           </div>
         )}
-
       </section>
-
     </main>
   );
 }
