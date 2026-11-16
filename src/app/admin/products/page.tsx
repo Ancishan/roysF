@@ -15,9 +15,13 @@ export default function ProductsPage() {
     const fetchProducts = async () => {
       try {
         const res = await api.get("/products");
-        setProducts(res.data.data || res.data);
+
+        const productData = res.data.data || res.data;
+
+        setProducts(Array.isArray(productData) ? productData : []);
       } catch (error) {
-        console.log(error);
+        console.error("Failed to fetch products:", error);
+        setProducts([]);
       } finally {
         setLoading(false);
       }
@@ -34,9 +38,7 @@ export default function ProductsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">
-            Products
-          </h1>
+          <h1 className="text-3xl font-bold">Products</h1>
 
           <p className="text-gray-500">
             Manage your products
