@@ -376,7 +376,7 @@ export default function ProductDetailsPage({
   // PRODUCT UNAVAILABLE
   // =========================
 
-  if (!product.isActive) {
+if (!currentProduct.isActive) {
     return (
       <main className="flex min-h-[60vh] flex-col items-center justify-center px-5 text-center">
         <h1 className="text-2xl font-semibold text-gray-900">
