@@ -51,7 +51,7 @@ interface OrderApiResponse {
   data: CreatedOrder;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://roysb.onrender.com";
 const DELIVERY_CHARGE = 110;
 const formatPrice = (price: number) => `৳${price.toLocaleString("en-BD")}`;
 

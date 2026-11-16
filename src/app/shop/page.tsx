@@ -22,7 +22,7 @@ type Product = {
 };
 
 const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+  process.env.NEXT_PUBLIC_API_URL || "https://roysb.onrender.com";
 
 function formatPrice(value: number | string) {
   return `৳${Number(value).toLocaleString("en-BD")}`;
