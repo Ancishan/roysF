@@ -74,7 +74,7 @@ export default function Footer() {
     const fetchSettings = async () => {
       try {
         const response = await fetch(
-          `${API_URL}/api/settings/public`,
+          `${API_URL}/settings/public`,
           {
             method: "GET",
             cache: "no-store",
