@@ -186,7 +186,7 @@ export default function AdminOrdersPage() {
       });
 
       const response = await fetch(
-        `${API_URL}/api/orders?${params.toString()}`,
+        `${API_URL}/orders?${params.toString()}`,
         {
           method: "GET",
           headers: getHeaders(),
@@ -250,7 +250,7 @@ export default function AdminOrdersPage() {
       setSuccess("");
 
       const response = await fetch(
-        `${API_URL}/api/orders/${orderId}/status`,
+        `${API_URL}/orders/${orderId}/status`,
         {
           method: "PATCH",
           headers: getHeaders(),
@@ -301,7 +301,7 @@ export default function AdminOrdersPage() {
       setSuccess("");
 
       const response = await fetch(
-        `${API_URL}/api/orders/${orderId}`,
+        `${API_URL}/orders/${orderId}`,
         {
           method: "DELETE",
           headers: getHeaders(),

@@ -109,7 +109,7 @@ export default function OrderDetailsPage() {
       setError("");
 
       const response = await fetch(
-        `${API_URL}/api/orders/${id}`,
+        `${API_URL}/orders/${id}`,
         {
           headers: getHeaders(),
           credentials: "include",
