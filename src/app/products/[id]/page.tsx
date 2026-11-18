@@ -507,7 +507,7 @@ if (!currentProduct.isActive) {
     try {
       setOrderSubmitting(true);
 
-      const response = await fetch(`${API_URL}/api/orders`, {
+      const response = await fetch(`${API_URL}/orders`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
