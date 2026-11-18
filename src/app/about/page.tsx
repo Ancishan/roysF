@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 const API_URL = (
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://roysb.onrender.com"
+  "https://roysb.onrender.com/api"
 )
   .replace(/\/+$/, "")
   .replace(/\/api$/i, "");
@@ -108,7 +108,7 @@ export const metadata: Metadata = {
 
 async function getAboutData(): Promise<AboutData | null> {
   try {
-    const response = await fetch(`${API_URL}/api/about/public`, {
+    const response = await fetch(`${API_URL}/about/public`, {
       cache: "no-store",
     });
 
