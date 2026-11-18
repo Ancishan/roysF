@@ -108,7 +108,7 @@ export const metadata: Metadata = {
 
 async function getAboutData(): Promise<AboutData | null> {
   try {
-    const response = await fetch(`${API_URL}/about/public`, {
+    const response = await fetch(`${API_URL}/api/about/public`, {
       cache: "no-store",
     });
 
