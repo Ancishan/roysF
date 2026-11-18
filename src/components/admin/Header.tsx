@@ -14,8 +14,12 @@ import {
   CheckCheck,
 } from "lucide-react";
 
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL || "https://roysb.onrender.com";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://roysb.onrender.com"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
 
 interface Notification {
   id: string;
@@ -95,58 +99,55 @@ export default function Header({ setOpen }: HeaderProps) {
   // ==========================================
 
   const fetchNotifications = useCallback(async () => {
-    try {
-      const response = await fetch(
-        `${API_URL}/api/notifications`,
-        {
-          method: "GET",
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
-
-      const result: ApiResponse = await response.json();
-
-      console.log("Notification API status:", response.status);
-      console.log("Notification API response:", result);
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message ||
-            `Notification API failed: ${response.status}`
-        );
+  try {
+    const response = await fetch(
+      `${API_URL}/api/notifications`,
+      {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
       }
+    );
 
-      const formattedNotifications = (result.data || []).map(
-        normalizeNotification
+    const result: ApiResponse = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message ||
+          `Notification API failed: ${response.status}`
       );
-
-      setNotifications(formattedNotifications);
-    } catch (error) {
-      console.error("Notification loading failed:", error);
-    } finally {
-      setLoading(false);
     }
-  }, []);
+
+    const formattedNotifications = (result.data || []).map(
+      normalizeNotification
+    );
+
+    setNotifications(formattedNotifications);
+  } catch (error) {
+    console.error("Notification loading failed:", error);
+  } finally {
+    setLoading(false);
+  }
+}, []);
 
   // ==========================================
   // SOCKET.IO REALTIME CONNECTION
   // ==========================================
 
-  useEffect(() => {
-    fetchNotifications();
-
-    const socket: Socket = io(API_URL, {
-      withCredentials: true,
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
-    });
+useEffect(() => {
+  const socket: Socket = io(API_URL, {
+    path: "/socket.io",
+    withCredentials: true,
+    transports: ["websocket", "polling"],
+    reconnection: true,
+    reconnectionAttempts: Infinity,
+    reconnectionDelay: 1000,
+  });
 
     socket.on("connect", () => {
       console.log("🔔 Admin notification socket connected");
       setConnected(true);
+      void fetchNotifications();
     });
 
     socket.on("disconnect", () => {
