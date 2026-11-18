@@ -11,7 +11,12 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "https://roysb.onrender.com";
+const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL ||
+  "https://roysb.onrender.com"
+)
+  .replace(/\/+$/, "")
+  .replace(/\/api$/i, "");
 
 // ==========================================
 // IMAGE URL HELPER
