@@ -33,37 +33,39 @@ export default function ShopPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    async function fetchProducts() {
-      try {
-        const response = await fetch(`${API_URL}/api/products`);
+useEffect(() => {
+  async function fetchProducts() {
+    try {
+      const response = await fetch(`${API_URL}/api/products`);
 
-        if (!response.ok) {
-          throw new Error("Products load করা যায়নি।");
-        }
-
-        const result = await response.json();
-
-        const productList = Array.isArray(result)
-          ? result
-          : Array.isArray(result.data)
-            ? result.data
-            : [];
-
-        setProducts(productList);
-      } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "কিছু একটা সমস্যা হয়েছে।"
-        );
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
       }
-    }
 
-    fetchProducts();
-  }, []);
+      const result = await response.json();
+
+      console.log("PRODUCT API RESPONSE:", result);
+
+      if (result.success && Array.isArray(result.data)) {
+        setProducts(result.data);
+      } else {
+        setProducts([]);
+      }
+    } catch (err) {
+      console.error("PRODUCT FETCH ERROR:", err);
+
+      setError(
+        err instanceof Error
+          ? err.message
+          : "কিছু একটা সমস্যা হয়েছে।"
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  fetchProducts();
+}, []);
 
   return (
     <main className="min-h-screen bg-white">
