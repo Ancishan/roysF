@@ -2,48 +2,57 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import type { ChangeEvent } from "react";
+
 import {
   Save,
   Loader2,
   Plus,
   Trash2,
+  Pencil,
   Users,
-  Sparkles,
-  Building2,
-  BookOpen,
   Target,
-  Eye,
+  Building2,
   ImagePlus,
   X,
+  RefreshCw,
+  Eye,
+  Upload,
+  Mail,
+  BookOpen,
+  Sparkles,
 } from "lucide-react";
 
-const API_URL = (
-  process.env.NEXT_PUBLIC_API_URL ||
-  "https://roysb.onrender.com"
+/* =========================================================
+   API CONFIGURATION
+========================================================= */
+
+const API_BASE = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 )
   .replace(/\/+$/, "")
-  .replace(/\/api$/i, "");
+  .replace(/\/api$/, "") + "/api";
 
-// ==========================================
-// TYPES
-// ==========================================
+/* =========================================================
+   TYPES
+========================================================= */
 
 type TeamMember = {
   id: string;
   name: string;
   designation: string;
-  roleType: "LEADERSHIP" | "GENERAL";
+  roleType: string;
   imageUrl: string;
   bio: string;
-  email?: string | null;
-  facebookUrl?: string | null;
-  linkedinUrl?: string | null;
-  instagramUrl?: string | null;
+  email: string | null;
+  facebookUrl: string | null;
+  linkedinUrl: string | null;
+  instagramUrl: string | null;
   displayOrder: number;
   isActive: boolean;
 };
 
-type Feature = {
+type Goal = {
   id: string;
   title: string;
   description: string;
@@ -57,185 +66,386 @@ type AboutData = {
   companySubtitle: string;
   heroImage: string;
   companyDescription: string;
-
   storyTitle: string;
   storyDescription: string;
-
   missionTitle: string;
   missionDescription: string;
   missionImage: string;
-
   visionTitle: string;
   visionDescription: string;
   visionImage: string;
-
   isActive: boolean;
-
   teamMembers: TeamMember[];
-  features: Feature[];
+  features: Goal[];
 };
 
-// ==========================================
-// INITIAL DATA
-// ==========================================
+type AboutImageField =
+  | "heroImage"
+  | "missionImage"
+  | "visionImage"
+  | "memberImage";
 
-const initialData: AboutData = {
+type AboutEditableField = Exclude<
+  keyof AboutData,
+  "teamMembers" | "features"
+>;
+
+type MemberForm = {
+  name: string;
+  designation: string;
+  roleType: string;
+  imageUrl: string;
+  bio: string;
+  email: string;
+  facebookUrl: string;
+  linkedinUrl: string;
+  instagramUrl: string;
+  displayOrder: number;
+  isActive: boolean;
+};
+
+type GoalForm = {
+  title: string;
+  description: string;
+  icon: string;
+  displayOrder: number;
+  isActive: boolean;
+};
+
+type ApiResponse<T = unknown> = {
+  success?: boolean;
+  message?: string;
+  data?: T;
+  url?: string;
+};
+
+/* =========================================================
+   DEFAULT DATA
+========================================================= */
+
+const emptyAbout: AboutData = {
   companyTitle: "About ROYS",
   companySubtitle: "",
   heroImage: "",
   companyDescription: "",
-
   storyTitle: "Our Story",
   storyDescription: "",
-
   missionTitle: "Our Mission",
   missionDescription: "",
   missionImage: "",
-
   visionTitle: "Our Vision",
   visionDescription: "",
   visionImage: "",
-
   isActive: true,
-
   teamMembers: [],
   features: [],
 };
 
-const inputClass =
-  "mt-2 w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm text-gray-800 outline-none transition focus:border-[#7f1d2d] focus:ring-2 focus:ring-[#7f1d2d]/10";
+const emptyMember: MemberForm = {
+  name: "",
+  designation: "",
+  roleType: "LEADERSHIP",
+  imageUrl: "",
+  bio: "",
+  email: "",
+  facebookUrl: "",
+  linkedinUrl: "",
+  instagramUrl: "",
+  displayOrder: 0,
+  isActive: true,
+};
 
-const labelClass =
-  "block text-sm font-semibold text-gray-700";
+const emptyGoal: GoalForm = {
+  title: "",
+  description: "",
+  icon: "target",
+  displayOrder: 0,
+  isActive: true,
+};
 
-// ==========================================
-// IMAGE URL HELPER
-// ==========================================
+/* =========================================================
+   API RESPONSE HANDLER
+========================================================= */
 
-function getImageUrl(imageUrl?: string | null) {
-  if (!imageUrl) return "";
+async function readResponse<T = unknown>(
+  response: Response
+): Promise<ApiResponse<T>> {
+  const result = (await response.json().catch(() => ({}))) as ApiResponse<T>;
 
-  if (
-    imageUrl.startsWith("http://") ||
-    imageUrl.startsWith("https://") ||
-    imageUrl.startsWith("blob:")
-  ) {
-    return imageUrl;
+  if (!response.ok || result.success === false) {
+    throw new Error(result.message || "Request failed.");
   }
 
-  return `${API_URL}${imageUrl.startsWith("/") ? "" : "/"}${imageUrl}`;
+  return result;
 }
 
-// ==========================================
-// MAIN COMPONENT
-// ==========================================
+/* =========================================================
+   REUSABLE INPUT COMPONENT
+   IMPORTANT: Declared outside AdminAboutPage
+========================================================= */
+
+type InputFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  type?: string;
+};
+
+function InputField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+}: InputFieldProps) {
+  return (
+    <label className="form-control w-full gap-2">
+      <span className="text-sm font-semibold">{label}</span>
+
+      <input
+        type={type}
+        className="input input-bordered w-full"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </label>
+  );
+}
+
+/* =========================================================
+   REUSABLE TEXTAREA COMPONENT
+========================================================= */
+
+type TextAreaFieldProps = {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+};
+
+function TextAreaField({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: TextAreaFieldProps) {
+  return (
+    <label className="form-control w-full gap-2">
+      <span className="text-sm font-semibold">{label}</span>
+
+      <textarea
+        className="textarea textarea-bordered min-h-32 w-full"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+      />
+    </label>
+  );
+}
+
+/* =========================================================
+   REUSABLE IMAGE UPLOADER
+   Cloudinary URL is handled by parent component
+========================================================= */
+
+type ImageUploaderProps = {
+  image: string;
+  field: AboutImageField;
+  label: string;
+  uploading: string;
+  member?: boolean;
+  onImageChange: (
+    event: ChangeEvent<HTMLInputElement>,
+    field: AboutImageField
+  ) => void;
+  onRemove: (field: AboutImageField) => void;
+};
+
+function ImageUploader({
+  image,
+  field,
+  label,
+  uploading,
+  member = false,
+  onImageChange,
+  onRemove,
+}: ImageUploaderProps) {
+  const isUploading = uploading === field;
+
+  return (
+    <div className="space-y-2">
+      <label className="text-sm font-semibold text-base-content">
+        {label}
+      </label>
+
+      <div className="relative overflow-hidden rounded-xl border border-base-300 bg-base-200">
+        {image ? (
+          <div className="relative">
+            <img
+              src={image}
+              alt={label}
+              className={
+                member
+                  ? "h-48 w-full object-cover"
+                  : "h-56 w-full object-cover"
+              }
+            />
+
+            <button
+              type="button"
+              onClick={() => onRemove(field)}
+              className="btn btn-circle btn-sm btn-error absolute right-3 top-3"
+              title="Remove image"
+              disabled={isUploading}
+            >
+              <X size={15} />
+            </button>
+
+            {isUploading && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/50 text-white">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Loader2 className="animate-spin" size={22} />
+                  Uploading...
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <label className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 text-base-content/50 transition hover:bg-base-300">
+            {isUploading ? (
+              <Loader2 className="animate-spin" size={30} />
+            ) : (
+              <ImagePlus size={34} />
+            )}
+
+            <span className="text-sm font-medium">
+              {isUploading ? "Uploading..." : "Choose Image"}
+            </span>
+
+            <span className="text-xs">PNG, JPG, WEBP · Max 5MB</span>
+
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              disabled={uploading !== ""}
+              onChange={(event) => onImageChange(event, field)}
+            />
+          </label>
+        )}
+
+        {image && (
+          <label
+            className={`flex cursor-pointer items-center justify-center gap-2 border-t border-base-300 p-3 text-sm font-semibold transition hover:bg-base-300 ${
+              uploading !== "" ? "pointer-events-none opacity-50" : ""
+            }`}
+          >
+            <Upload size={16} />
+            Change Image
+
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              className="hidden"
+              disabled={uploading !== ""}
+              onChange={(event) => onImageChange(event, field)}
+            />
+          </label>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   MAIN ADMIN ABOUT PAGE
+========================================================= */
 
 export default function AdminAboutPage() {
-  const [data, setData] = useState<AboutData>(initialData);
+  /* -------------------------------------------------------
+     STATES
+  ------------------------------------------------------- */
+
+  const [about, setAbout] = useState<AboutData>(emptyAbout);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
+  const [uploading, setUploading] = useState("");
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
-  // ========================================
-  // TEAM FORM
-  // ========================================
-
-  const [teamForm, setTeamForm] = useState({
-    name: "",
-    designation: "",
-    roleType: "LEADERSHIP",
-    bio: "",
-    email: "",
-    facebookUrl: "",
-    linkedinUrl: "",
-    instagramUrl: "",
-    displayOrder: 0,
+  const [memberForm, setMemberForm] = useState<MemberForm>({
+    ...emptyMember,
   });
 
-  const [teamImageFile, setTeamImageFile] = useState<File | null>(null);
-  const [teamImagePreview, setTeamImagePreview] = useState("");
+  const [editingMember, setEditingMember] = useState<string | null>(null);
+  const [memberModal, setMemberModal] = useState(false);
+  const [savingMember, setSavingMember] = useState(false);
 
-  // ========================================
-  // FEATURE FORM
-  // ========================================
-
-  const [featureForm, setFeatureForm] = useState({
-    title: "",
-    description: "",
-    icon: "star",
-    displayOrder: 0,
+  const [goalForm, setGoalForm] = useState<GoalForm>({
+    ...emptyGoal,
   });
 
-  // ========================================
-  // PREVIEW CLEANUP
-  // ========================================
+  const [editingGoal, setEditingGoal] = useState<string | null>(null);
+  const [goalModal, setGoalModal] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
 
-  useEffect(() => {
-    return () => {
-      if (teamImagePreview.startsWith("blob:")) {
-        URL.revokeObjectURL(teamImagePreview);
-      }
-    };
-  }, [teamImagePreview]);
+  const [deleting, setDeleting] = useState("");
 
-  // ========================================
-  // API HELPER
-  // ========================================
+  /* -------------------------------------------------------
+     COMMON API REQUEST
+  ------------------------------------------------------- */
 
   const request = useCallback(
-    async (path: string, options: RequestInit = {}) => {
-      const isFormData = options.body instanceof FormData;
+    async <T = unknown,>(
+      path: string,
+      options: RequestInit = {}
+    ): Promise<ApiResponse<T>> => {
+      const headers = new Headers(options.headers);
 
-      const response = await fetch(
-        `${API_URL}/api/about${path}`,
-        {
-          ...options,
-          credentials: "include",
-          headers: {
-            ...(!isFormData && options.body
-              ? { "Content-Type": "application/json" }
-              : {}),
-            ...options.headers,
-          },
-        },
-      );
-
-      const result = await response.json();
-
-      if (!response.ok || !result.success) {
-        throw new Error(
-          result.message || "Request failed.",
-        );
+      if (!(options.body instanceof FormData)) {
+        headers.set("Content-Type", "application/json");
       }
 
-      return result.data;
+      const response = await fetch(`${API_BASE}/about${path}`, {
+        ...options,
+        headers,
+        credentials: "include",
+      });
+
+      return readResponse<T>(response);
     },
-    [],
+    []
   );
 
-  // ========================================
-  // LOAD DATA
-  // ========================================
+  /* -------------------------------------------------------
+     LOAD ABOUT DATA
+  ------------------------------------------------------- */
 
-  const loadData = useCallback(async () => {
+  const loadAbout = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
     try {
-      setLoading(true);
-      setError("");
+      const result = await request<Partial<AboutData>>("/admin");
 
-      const result = await request("/admin");
-
-      setData({
-        ...initialData,
-        ...result,
-      });
+      if (result.data) {
+        setAbout({
+          ...emptyAbout,
+          ...result.data,
+          teamMembers: Array.isArray(result.data.teamMembers)
+            ? result.data.teamMembers
+            : [],
+          features: Array.isArray(result.data.features)
+            ? result.data.features
+            : [],
+        });
+      }
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load About page.",
+        err instanceof Error ? err.message : "Failed to load About page."
       );
     } finally {
       setLoading(false);
@@ -243,1077 +453,1220 @@ export default function AdminAboutPage() {
   }, [request]);
 
   useEffect(() => {
-    void loadData();
-  }, [loadData]);
+    void loadAbout();
+  }, [loadAbout]);
 
-  // ========================================
-  // UPDATE FIELD
-  // ========================================
+  /* -------------------------------------------------------
+     CLOUDINARY IMAGE UPLOAD
+     Uses existing Next.js /api/upload endpoint
+  ------------------------------------------------------- */
 
-  const updateField = (
-    field: keyof AboutData,
-    value: string | boolean,
-  ) => {
-    setData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
+  const uploadImage = async (file: File): Promise<string> => {
+    if (!file.type.startsWith("image/")) {
+      throw new Error("Please select a valid image.");
+    }
 
-    setSuccess("");
+    if (file.size > 5 * 1024 * 1024) {
+      throw new Error("Image size must be below 5MB.");
+    }
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+      credentials: "include",
+    });
+
+    const result = await readResponse(response);
+
+    if (!result.url || typeof result.url !== "string") {
+      throw new Error("Cloudinary image URL was not returned.");
+    }
+
+    return result.url;
   };
 
-  // ========================================
-  // IMAGE SELECT
-  // ========================================
+  /* -------------------------------------------------------
+     HANDLE IMAGE CHANGE
+  ------------------------------------------------------- */
 
-  const handleTeamImageChange = (
-    event: React.ChangeEvent<HTMLInputElement>,
+  const handleImageChange = async (
+    event: ChangeEvent<HTMLInputElement>,
+    field: AboutImageField
   ) => {
     const file = event.target.files?.[0];
+
+    // Allow selecting the same file again
+    event.target.value = "";
 
     if (!file) return;
 
     setError("");
-    setSuccess("");
+    setMessage("");
+    setUploading(field);
 
-    if (!file.type.startsWith("image/")) {
-      setError("Please select a valid image file.");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5 MB.");
-      event.target.value = "";
-      return;
-    }
-
-    setTeamImageFile(file);
-    setTeamImagePreview(URL.createObjectURL(file));
-  };
-
-  // ========================================
-  // REMOVE SELECTED IMAGE
-  // ========================================
-
-  const removeTeamImage = () => {
-    setTeamImageFile(null);
-    setTeamImagePreview("");
-  };
-
-  // ========================================
-  // SAVE ABOUT PAGE
-  // ========================================
-
-  const savePage = async () => {
     try {
-      setSaving(true);
-      setError("");
-      setSuccess("");
+      const url = await uploadImage(file);
 
-      const payload = {
-        companyTitle: data.companyTitle,
-        companySubtitle: data.companySubtitle,
-        heroImage: data.heroImage,
-        companyDescription: data.companyDescription,
+      if (field === "memberImage") {
+        setMemberForm((prev) => ({
+          ...prev,
+          imageUrl: url,
+        }));
+      } else {
+        setAbout((prev) => ({
+          ...prev,
+          [field]: url,
+        }));
+      }
 
-        storyTitle: data.storyTitle,
-        storyDescription: data.storyDescription,
-
-        missionTitle: data.missionTitle,
-        missionDescription: data.missionDescription,
-        missionImage: data.missionImage,
-
-        visionTitle: data.visionTitle,
-        visionDescription: data.visionDescription,
-        visionImage: data.visionImage,
-
-        isActive: data.isActive,
-      };
-
-      const result = await request("/page", {
-        method: "PATCH",
-        body: JSON.stringify(payload),
-      });
-
-      setData((prev) => ({
-        ...prev,
-        ...result,
-      }));
-
-      setSuccess(
-        "About page information saved successfully!",
-      );
+      setMessage("Image uploaded successfully.");
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to save About page.",
+        err instanceof Error ? err.message : "Image upload failed."
+      );
+    } finally {
+      setUploading("");
+    }
+  };
+
+  /* -------------------------------------------------------
+     REMOVE IMAGE
+  ------------------------------------------------------- */
+
+  const removeImage = (field: AboutImageField) => {
+    if (field === "memberImage") {
+      setMemberForm((prev) => ({
+        ...prev,
+        imageUrl: "",
+      }));
+      return;
+    }
+
+    setAbout((prev) => ({
+      ...prev,
+      [field]: "",
+    }));
+  };
+
+  /* -------------------------------------------------------
+     UPDATE ABOUT FIELD
+  ------------------------------------------------------- */
+
+  const updateAbout = (
+    field: AboutEditableField,
+    value: string | boolean
+  ) => {
+    setAbout((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
+
+  /* -------------------------------------------------------
+     SAVE COMPANY INFORMATION
+  ------------------------------------------------------- */
+
+  const saveAbout = async () => {
+    setSaving(true);
+    setError("");
+    setMessage("");
+
+    try {
+      const result = await request<Partial<AboutData>>("/page", {
+        method: "PATCH",
+        body: JSON.stringify({
+          companyTitle: about.companyTitle,
+          companySubtitle: about.companySubtitle,
+          heroImage: about.heroImage,
+          companyDescription: about.companyDescription,
+
+          storyTitle: about.storyTitle,
+          storyDescription: about.storyDescription,
+
+          missionTitle: about.missionTitle,
+          missionDescription: about.missionDescription,
+          missionImage: about.missionImage,
+
+          visionTitle: about.visionTitle,
+          visionDescription: about.visionDescription,
+          visionImage: about.visionImage,
+
+          isActive: about.isActive,
+        }),
+      });
+
+      if (result.data) {
+        setAbout((prev) => ({
+          ...prev,
+          ...result.data,
+        }));
+      }
+
+      setMessage("Company information saved successfully.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save information."
       );
     } finally {
       setSaving(false);
     }
   };
 
-  // ========================================
-  // ADD TEAM MEMBER WITH IMAGE UPLOAD
-  // ========================================
+  /* =======================================================
+     TEAM MEMBER FUNCTIONS
+  ======================================================= */
 
-  const addTeamMember = async () => {
-    try {
-      setError("");
-      setSuccess("");
-
-      if (!teamForm.name.trim()) {
-        throw new Error("Please enter team member name.");
-      }
-
-      if (!teamForm.designation.trim()) {
-        throw new Error("Please enter designation.");
-      }
-
-      if (!teamImageFile) {
-        throw new Error("Please select a profile image.");
-      }
-
-      const formData = new FormData();
-
-      Object.entries(teamForm).forEach(([key, value]) => {
-        formData.append(key, String(value));
-      });
-
-      formData.append("image", teamImageFile);
-
-      const created = await request("/team", {
-        method: "POST",
-        body: formData,
-      });
-
-      setData((prev) => ({
-        ...prev,
-        teamMembers: [
-          ...prev.teamMembers,
-          created,
-        ],
-      }));
-
-      setTeamForm({
-        name: "",
-        designation: "",
-        roleType: "LEADERSHIP",
-        bio: "",
-        email: "",
-        facebookUrl: "",
-        linkedinUrl: "",
-        instagramUrl: "",
-        displayOrder: 0,
-      });
-
-      setTeamImageFile(null);
-      setTeamImagePreview("");
-
-      setSuccess("Team member added successfully!");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to add team member.",
-      );
-    }
+  const openNewMember = () => {
+    setMemberForm({ ...emptyMember });
+    setEditingMember(null);
+    setMemberModal(true);
+    setError("");
   };
 
-  // ========================================
-  // TOGGLE TEAM MEMBER
-  // ========================================
+  const openEditMember = (member: TeamMember) => {
+    setMemberForm({
+      name: member.name,
+      designation: member.designation,
+      roleType: member.roleType,
+      imageUrl: member.imageUrl || "",
+      bio: member.bio || "",
+      email: member.email || "",
+      facebookUrl: member.facebookUrl || "",
+      linkedinUrl: member.linkedinUrl || "",
+      instagramUrl: member.instagramUrl || "",
+      displayOrder: member.displayOrder,
+      isActive: member.isActive,
+    });
 
-  const toggleTeam = async (member: TeamMember) => {
-    try {
-      setError("");
-
-      const updated = await request(
-        `/team/${member.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            isActive: !member.isActive,
-          }),
-        },
-      );
-
-      setData((prev) => ({
-        ...prev,
-        teamMembers: prev.teamMembers.map((item) =>
-          item.id === member.id ? updated : item,
-        ),
-      }));
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to update member.",
-      );
-    }
+    setEditingMember(member.id);
+    setMemberModal(true);
+    setError("");
   };
 
-  // ========================================
-  // DELETE TEAM MEMBER
-  // ========================================
+  /* -------------------------------------------------------
+     SAVE TEAM MEMBER
+  ------------------------------------------------------- */
 
-  const deleteTeam = async (id: string) => {
-    if (!window.confirm("Delete this team member?")) {
+  const saveMember = async () => {
+    if (!memberForm.name.trim() || !memberForm.designation.trim()) {
+      setError("Member name and designation are required.");
       return;
     }
 
-    try {
-      setError("");
+    setSavingMember(true);
+    setError("");
+    setMessage("");
 
+    try {
+      const result = await request<TeamMember>(
+        editingMember ? `/team/${editingMember}` : "/team",
+        {
+          method: editingMember ? "PATCH" : "POST",
+          body: JSON.stringify(memberForm),
+        }
+      );
+
+      if (!result.data) {
+        throw new Error("Member data was not returned by the server.");
+      }
+
+      const member = result.data;
+
+      setAbout((prev) => ({
+        ...prev,
+        teamMembers: editingMember
+          ? prev.teamMembers.map((item) =>
+              item.id === editingMember ? member : item
+            )
+          : [...prev.teamMembers, member].sort(
+              (a, b) => a.displayOrder - b.displayOrder
+            ),
+      }));
+
+      setMemberModal(false);
+      setMemberForm({ ...emptyMember });
+      setEditingMember(null);
+
+      setMessage("Team member saved successfully.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save team member."
+      );
+    } finally {
+      setSavingMember(false);
+    }
+  };
+
+  /* -------------------------------------------------------
+     DELETE TEAM MEMBER
+  ------------------------------------------------------- */
+
+  const deleteMember = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this member?")) {
+      return;
+    }
+
+    setDeleting(id);
+    setError("");
+    setMessage("");
+
+    try {
       await request(`/team/${id}`, {
         method: "DELETE",
       });
 
-      setData((prev) => ({
+      setAbout((prev) => ({
         ...prev,
         teamMembers: prev.teamMembers.filter(
-          (item) => item.id !== id,
+          (member) => member.id !== id
         ),
       }));
 
-      setSuccess("Team member deleted.");
+      setMessage("Team member deleted successfully.");
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to delete member.",
+        err instanceof Error ? err.message : "Failed to delete member."
       );
+    } finally {
+      setDeleting("");
     }
   };
 
-  // ========================================
-  // ADD FEATURE
-  // ========================================
+  /* =======================================================
+     GOAL FUNCTIONS
+  ======================================================= */
 
-  const addFeature = async () => {
-    try {
-      setError("");
-      setSuccess("");
-
-      if (!featureForm.title.trim()) {
-        throw new Error("Please enter feature title.");
-      }
-
-      const created = await request("/features", {
-        method: "POST",
-        body: JSON.stringify(featureForm),
-      });
-
-      setData((prev) => ({
-        ...prev,
-        features: [
-          ...prev.features,
-          created,
-        ],
-      }));
-
-      setFeatureForm({
-        title: "",
-        description: "",
-        icon: "star",
-        displayOrder: 0,
-      });
-
-      setSuccess("Feature added successfully!");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to add feature.",
-      );
-    }
+  const openNewGoal = () => {
+    setGoalForm({ ...emptyGoal });
+    setEditingGoal(null);
+    setGoalModal(true);
+    setError("");
   };
 
-  // ========================================
-  // TOGGLE FEATURE
-  // ========================================
+  const openEditGoal = (goal: Goal) => {
+    setGoalForm({
+      title: goal.title,
+      description: goal.description,
+      icon: goal.icon,
+      displayOrder: goal.displayOrder,
+      isActive: goal.isActive,
+    });
 
-  const toggleFeature = async (feature: Feature) => {
-    try {
-      setError("");
-
-      const updated = await request(
-        `/features/${feature.id}`,
-        {
-          method: "PATCH",
-          body: JSON.stringify({
-            isActive: !feature.isActive,
-          }),
-        },
-      );
-
-      setData((prev) => ({
-        ...prev,
-        features: prev.features.map((item) =>
-          item.id === feature.id ? updated : item,
-        ),
-      }));
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to update feature.",
-      );
-    }
+    setEditingGoal(goal.id);
+    setGoalModal(true);
+    setError("");
   };
 
-  // ========================================
-  // DELETE FEATURE
-  // ========================================
+  /* -------------------------------------------------------
+     SAVE GOAL
+  ------------------------------------------------------- */
 
-  const deleteFeature = async (id: string) => {
-    if (!window.confirm("Delete this feature?")) {
+  const saveGoal = async () => {
+    if (!goalForm.title.trim()) {
+      setError("Goal title is required.");
       return;
     }
 
-    try {
-      setError("");
+    setSavingGoal(true);
+    setError("");
+    setMessage("");
 
+    try {
+      const result = await request<Goal>(
+        editingGoal ? `/features/${editingGoal}` : "/features",
+        {
+          method: editingGoal ? "PATCH" : "POST",
+          body: JSON.stringify(goalForm),
+        }
+      );
+
+      if (!result.data) {
+        throw new Error("Goal data was not returned by the server.");
+      }
+
+      const goal = result.data;
+
+      setAbout((prev) => ({
+        ...prev,
+        features: editingGoal
+          ? prev.features.map((item) =>
+              item.id === editingGoal ? goal : item
+            )
+          : [...prev.features, goal].sort(
+              (a, b) => a.displayOrder - b.displayOrder
+            ),
+      }));
+
+      setGoalModal(false);
+      setGoalForm({ ...emptyGoal });
+      setEditingGoal(null);
+
+      setMessage("Goal saved successfully.");
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to save goal."
+      );
+    } finally {
+      setSavingGoal(false);
+    }
+  };
+
+  /* -------------------------------------------------------
+     DELETE GOAL
+  ------------------------------------------------------- */
+
+  const deleteGoal = async (id: string) => {
+    if (!window.confirm("Are you sure you want to delete this goal?")) {
+      return;
+    }
+
+    setDeleting(id);
+    setError("");
+    setMessage("");
+
+    try {
       await request(`/features/${id}`, {
         method: "DELETE",
       });
 
-      setData((prev) => ({
+      setAbout((prev) => ({
         ...prev,
-        features: prev.features.filter(
-          (item) => item.id !== id,
-        ),
+        features: prev.features.filter((goal) => goal.id !== id),
       }));
 
-      setSuccess("Feature deleted.");
+      setMessage("Goal deleted successfully.");
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to delete feature.",
+        err instanceof Error ? err.message : "Failed to delete goal."
       );
+    } finally {
+      setDeleting("");
     }
   };
 
-  // ========================================
-  // LOADING
-  // ========================================
+  /* =======================================================
+     LOADING UI
+  ======================================================= */
 
   if (loading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center">
-        <Loader2
-          className="animate-spin text-[#7f1d2d]"
-          size={32}
-        />
+        <Loader2 className="animate-spin text-primary" size={36} />
       </div>
     );
   }
 
-  // ========================================
-  // UI
-  // ========================================
+  /* =======================================================
+     MAIN UI
+  ======================================================= */
 
   return (
-    <main className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-7">
+    <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6 lg:p-8">
 
-        {/* HEADER */}
+      {/* HEADER */}
 
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">
-              About Us Management
-            </h1>
-
-            <p className="mt-1 text-sm text-gray-500">
-              Manage your website About Us page.
-            </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="mb-2 flex items-center gap-2 text-sm text-base-content/50">
+            <Building2 size={16} />
+            Admin / Content Management / About
           </div>
 
-          <button
-            onClick={savePage}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-[#7f1d2d] px-5 py-3 text-sm font-semibold text-white hover:bg-[#681725] disabled:opacity-60"
+          <h1 className="text-3xl font-bold">About ROYS</h1>
+
+          <p className="mt-2 text-sm text-base-content/60">
+            Manage company information, team members and goals.
+          </p>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <a
+            href="/about"
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-outline"
           >
-            {saving ? (
-              <Loader2
-                size={17}
-                className="animate-spin"
-              />
-            ) : (
-              <Save size={17} />
-            )}
-
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </header>
-
-        {/* MESSAGES */}
-
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            {success}
-          </div>
-        )}
-
-        {/* COMPANY INFORMATION */}
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
-          <SectionTitle
-            icon={<Building2 size={20} />}
-            title="Company Information"
-            subtitle="Main heading and introduction."
-          />
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field
-              label="Company Title"
-              value={data.companyTitle}
-              onChange={(v) => updateField("companyTitle", v)}
-              placeholder="About ROYS"
-            />
-
-            <Field
-              label="Company Subtitle"
-              value={data.companySubtitle}
-              onChange={(v) => updateField("companySubtitle", v)}
-              placeholder="A little story about who we are"
-            />
-
-            <Field
-              label="Hero Image URL"
-              value={data.heroImage}
-              onChange={(v) => updateField("heroImage", v)}
-              placeholder="https://example.com/about-banner.jpg"
-            />
-
-            <div className="md:col-span-2">
-              <TextArea
-                label="Company Description"
-                value={data.companyDescription}
-                onChange={(v) => updateField("companyDescription", v)}
-                placeholder="Write about your company..."
-              />
-            </div>
-          </div>
-
-          {data.heroImage && (
-            <div className="mt-5">
-              <p className="mb-2 text-xs font-semibold text-gray-500">
-                Hero Image Preview
-              </p>
-
-              <img
-                src={data.heroImage}
-                alt="About hero preview"
-                className="h-48 w-full rounded-xl object-cover"
-              />
-            </div>
-          )}
-
-          <Toggle
-            label="Show About page publicly"
-            checked={data.isActive}
-            onChange={(v) => updateField("isActive", v)}
-          />
-        </section>
-
-        {/* OUR STORY */}
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
-          <SectionTitle
-            icon={<BookOpen size={20} />}
-            title="Our Story"
-            subtitle="Tell customers how ROYS started."
-          />
-
-          <Field
-            label="Story Heading"
-            value={data.storyTitle}
-            onChange={(v) => updateField("storyTitle", v)}
-          />
-
-          <div className="mt-5">
-            <TextArea
-              label="Story Description"
-              value={data.storyDescription}
-              onChange={(v) => updateField("storyDescription", v)}
-              placeholder="Write your company story..."
-              rows={6}
-            />
-          </div>
-        </section>
-
-        {/* OUR MISSION */}
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
-          <SectionTitle
-            icon={<Target size={20} />}
-            title="Our Mission"
-            subtitle="Explain your company's mission."
-          />
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field
-              label="Mission Heading"
-              value={data.missionTitle}
-              onChange={(v) => updateField("missionTitle", v)}
-            />
-
-            <Field
-              label="Mission Image URL"
-              value={data.missionImage}
-              onChange={(v) => updateField("missionImage", v)}
-              placeholder="https://example.com/mission.jpg"
-            />
-
-            <div className="md:col-span-2">
-              <TextArea
-                label="Mission Description"
-                value={data.missionDescription}
-                onChange={(v) => updateField("missionDescription", v)}
-                rows={4}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* OUR VISION */}
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
-          <SectionTitle
-            icon={<Eye size={20} />}
-            title="Our Vision"
-            subtitle="Describe your future goals."
-          />
-
-          <div className="grid gap-5 md:grid-cols-2">
-            <Field
-              label="Vision Heading"
-              value={data.visionTitle}
-              onChange={(v) => updateField("visionTitle", v)}
-            />
-
-            <Field
-              label="Vision Image URL"
-              value={data.visionImage}
-              onChange={(v) => updateField("visionImage", v)}
-              placeholder="https://example.com/vision.jpg"
-            />
-
-            <div className="md:col-span-2">
-              <TextArea
-                label="Vision Description"
-                value={data.visionDescription}
-                onChange={(v) => updateField("visionDescription", v)}
-                rows={4}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* TEAM MEMBERS */}
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
-          <SectionTitle
-            icon={<Users size={20} />}
-            title="Team Members"
-            subtitle="Add leadership and general team members."
-          />
-
-          <div className="grid gap-4 md:grid-cols-2">
-
-            <Field
-              label="Full Name"
-              value={teamForm.name}
-              onChange={(v) =>
-                setTeamForm((p) => ({ ...p, name: v }))
-              }
-            />
-
-            <Field
-              label="Designation"
-              value={teamForm.designation}
-              onChange={(v) =>
-                setTeamForm((p) => ({ ...p, designation: v }))
-              }
-            />
-
-            <label className={labelClass}>
-              Team Category
-
-              <select
-                className={inputClass}
-                value={teamForm.roleType}
-                onChange={(e) =>
-                  setTeamForm((p) => ({
-                    ...p,
-                    roleType: e.target.value,
-                  }))
-                }
-              >
-                <option value="LEADERSHIP">
-                  Leadership
-                </option>
-
-                <option value="GENERAL">
-                  General Team
-                </option>
-              </select>
-            </label>
-
-            {/* PROFILE IMAGE UPLOAD */}
-
-            <div>
-              <label className={labelClass}>
-                Profile Image
-
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp,image/gif"
-                  onChange={handleTeamImageChange}
-                  className="hidden"
-                  id="team-profile-image"
-                />
-              </label>
-
-              <label
-                htmlFor="team-profile-image"
-                className="mt-2 flex min-h-[48px] cursor-pointer items-center justify-center gap-2 rounded-xl border-2 border-dashed border-gray-300 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-600 transition hover:border-[#7f1d2d] hover:bg-[#7f1d2d]/5"
-              >
-                <ImagePlus size={19} className="text-[#7f1d2d]" />
-
-                {teamImageFile
-                  ? "Change Selected Image"
-                  : "Choose Image From Computer"}
-              </label>
-
-              <p className="mt-2 text-xs text-gray-400">
-                JPG, PNG, WEBP or GIF. Maximum size 5 MB.
-              </p>
-
-              {teamImagePreview && (
-                <div className="relative mt-4 inline-block">
-                  <img
-                    src={teamImagePreview}
-                    alt="Team member preview"
-                    className="h-28 w-28 rounded-xl border border-gray-200 object-cover"
-                  />
-
-                  <button
-                    type="button"
-                    onClick={removeTeamImage}
-                    className="absolute -right-2 -top-2 flex h-7 w-7 items-center justify-center rounded-full bg-red-600 text-white shadow hover:bg-red-700"
-                    aria-label="Remove selected image"
-                  >
-                    <X size={15} />
-                  </button>
-
-                  <p className="mt-2 max-w-40 truncate text-xs text-gray-500">
-                    {teamImageFile?.name}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <Field
-              label="Email"
-              value={teamForm.email}
-              onChange={(v) =>
-                setTeamForm((p) => ({ ...p, email: v }))
-              }
-            />
-
-            <Field
-              label="Display Order"
-              type="number"
-              value={String(teamForm.displayOrder)}
-              onChange={(v) =>
-                setTeamForm((p) => ({
-                  ...p,
-                  displayOrder: Number(v),
-                }))
-              }
-            />
-
-            <div className="md:col-span-2">
-              <TextArea
-                label="Short Bio"
-                value={teamForm.bio}
-                onChange={(v) =>
-                  setTeamForm((p) => ({ ...p, bio: v }))
-                }
-              />
-            </div>
-
-            <Field
-              label="Facebook URL"
-              value={teamForm.facebookUrl}
-              onChange={(v) =>
-                setTeamForm((p) => ({ ...p, facebookUrl: v }))
-              }
-            />
-
-            <Field
-              label="LinkedIn URL"
-              value={teamForm.linkedinUrl}
-              onChange={(v) =>
-                setTeamForm((p) => ({ ...p, linkedinUrl: v }))
-              }
-            />
-
-            <Field
-              label="Instagram URL"
-              value={teamForm.instagramUrl}
-              onChange={(v) =>
-                setTeamForm((p) => ({ ...p, instagramUrl: v }))
-              }
-            />
-          </div>
+            <Eye size={17} />
+            Preview Page
+          </a>
 
           <button
             type="button"
-            onClick={addTeamMember}
-            disabled={!teamImageFile}
-            className="mt-5 flex items-center gap-2 rounded-xl bg-[#7f1d2d] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#681725] disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={() => void loadAbout()}
+            className="btn btn-outline"
           >
-            <Plus size={17} />
-            Add Team Member
-          </button>
-
-          {/* TEAM LIST */}
-
-          <div className="mt-7 space-y-3">
-            {data.teamMembers.map((member) => (
-              <div
-                key={member.id}
-                className="flex flex-wrap items-center gap-4 rounded-xl border border-gray-100 p-4"
-              >
-                {member.imageUrl ? (
-                  <img
-                    src={getImageUrl(member.imageUrl)}
-                    alt={member.name}
-                    className="h-14 w-14 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-100">
-                    <Users size={20} />
-                  </div>
-                )}
-
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold text-gray-900">
-                    {member.name}
-                  </p>
-
-                  <p className="text-sm text-gray-500">
-                    {member.designation} · {member.roleType}
-                  </p>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => toggleTeam(member)}
-                  className={`rounded-lg px-3 py-2 text-xs font-semibold ${
-                    member.isActive
-                      ? "bg-green-50 text-green-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {member.isActive ? "Active" : "Inactive"}
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => deleteTeam(member.id)}
-                  className="rounded-lg p-2 text-red-600 hover:bg-red-50"
-                  aria-label="Delete team member"
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            ))}
-
-            {data.teamMembers.length === 0 && (
-              <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
-                No team members added yet.
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* WHY CHOOSE ROYS */}
-
-        <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:p-7">
-          <SectionTitle
-            icon={<Sparkles size={20} />}
-            title="Why Choose ROYS"
-            subtitle="Add reasons why customers should choose your store."
-          />
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Field
-              label="Feature Title"
-              value={featureForm.title}
-              onChange={(v) =>
-                setFeatureForm((p) => ({ ...p, title: v }))
-              }
-              placeholder="Quality Products"
-            />
-
-            <Field
-              label="Icon Name"
-              value={featureForm.icon}
-              onChange={(v) =>
-                setFeatureForm((p) => ({ ...p, icon: v }))
-              }
-              placeholder="star, truck, shield-check"
-            />
-
-            <Field
-              label="Display Order"
-              type="number"
-              value={String(featureForm.displayOrder)}
-              onChange={(v) =>
-                setFeatureForm((p) => ({
-                  ...p,
-                  displayOrder: Number(v),
-                }))
-              }
-            />
-
-            <div className="md:col-span-2">
-              <TextArea
-                label="Feature Description"
-                value={featureForm.description}
-                onChange={(v) =>
-                  setFeatureForm((p) => ({
-                    ...p,
-                    description: v,
-                  }))
-                }
-              />
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={addFeature}
-            className="mt-5 flex items-center gap-2 rounded-xl bg-[#7f1d2d] px-5 py-3 text-sm font-semibold text-white"
-          >
-            <Plus size={17} />
-            Add Feature
-          </button>
-
-          {/* FEATURE LIST */}
-
-          <div className="mt-7 grid gap-3 md:grid-cols-2">
-            {data.features.map((feature) => (
-              <div
-                key={feature.id}
-                className="rounded-xl border border-gray-100 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-semibold text-gray-900">
-                      {feature.title}
-                    </p>
-
-                    <p className="mt-1 text-sm text-gray-500">
-                      {feature.description}
-                    </p>
-
-                    <p className="mt-2 text-xs text-gray-400">
-                      Icon: {feature.icon}
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => deleteFeature(feature.id)}
-                    className="rounded-lg p-2 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 size={17} />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => toggleFeature(feature)}
-                  className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold ${
-                    feature.isActive
-                      ? "bg-green-50 text-green-700"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {feature.isActive
-                    ? "Active — click to hide"
-                    : "Inactive — click to show"}
-                </button>
-              </div>
-            ))}
-
-            {data.features.length === 0 && (
-              <p className="rounded-xl bg-gray-50 p-4 text-sm text-gray-500">
-                No features added yet.
-              </p>
-            )}
-          </div>
-        </section>
-
-        {/* BOTTOM SAVE */}
-
-        <div className="flex justify-end pb-10">
-          <button
-            onClick={savePage}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-[#7f1d2d] px-6 py-3 font-semibold text-white hover:bg-[#681725] disabled:opacity-60"
-          >
-            {saving ? (
-              <Loader2
-                size={17}
-                className="animate-spin"
-              />
-            ) : (
-              <Save size={17} />
-            )}
-
-            {saving ? "Saving..." : "Save Page Information"}
+            <RefreshCw size={17} />
+            Refresh
           </button>
         </div>
       </div>
-    </main>
-  );
-}
 
-// ==========================================
-// REUSABLE COMPONENTS
-// ==========================================
+      {/* NOTIFICATIONS */}
 
-function SectionTitle({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-}) {
-  return (
-    <div className="mb-6 flex items-center gap-3">
-      <div className="rounded-xl bg-[#7f1d2d]/10 p-3 text-[#7f1d2d]">
-        {icon}
+      {error && (
+        <div className="alert alert-error">
+          <span>{error}</span>
+
+          <button
+            type="button"
+            onClick={() => setError("")}
+            aria-label="Close error"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {message && (
+        <div className="alert alert-success">
+          <span>{message}</span>
+
+          <button
+            type="button"
+            onClick={() => setMessage("")}
+            aria-label="Close message"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* PUBLIC PAGE STATUS */}
+
+      <div className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body flex-row items-center justify-between">
+          <div>
+            <h3 className="font-bold">Public About Page</h3>
+
+            <p className="text-sm text-base-content/60">
+              Control whether visitors can see the About page.
+            </p>
+          </div>
+
+          <label className="flex cursor-pointer items-center gap-3">
+            <span className="text-sm font-semibold">
+              {about.isActive ? "Active" : "Inactive"}
+            </span>
+
+            <input
+              type="checkbox"
+              className="toggle toggle-success"
+              checked={about.isActive}
+              onChange={(event) =>
+                updateAbout("isActive", event.target.checked)
+              }
+            />
+          </label>
+        </div>
       </div>
 
-      <div>
-        <h2 className="font-bold text-gray-900">
-          {title}
-        </h2>
+      {/* COMPANY HERO */}
 
-        <p className="mt-1 text-xs text-gray-500">
-          {subtitle}
-        </p>
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-6">
+          <div className="flex items-center gap-3 border-b border-base-300 pb-4">
+            <div className="rounded-lg bg-primary/10 p-3 text-primary">
+              <Building2 size={22} />
+            </div>
+
+            <div>
+              <h2 className="text-xl font-bold">Company Banner</h2>
+
+              <p className="text-sm text-base-content/60">
+                Main ROYS introduction and banner image.
+              </p>
+            </div>
+          </div>
+
+          <ImageUploader
+            image={about.heroImage}
+            field="heroImage"
+            label="Company Banner Image"
+            uploading={uploading}
+            onImageChange={handleImageChange}
+            onRemove={removeImage}
+          />
+
+          <div className="grid gap-5 md:grid-cols-2">
+            <InputField
+              label="Company Heading"
+              value={about.companyTitle}
+              onChange={(value) => updateAbout("companyTitle", value)}
+              placeholder="About ROYS"
+            />
+
+            <InputField
+              label="Company Subtitle"
+              value={about.companySubtitle}
+              onChange={(value) => updateAbout("companySubtitle", value)}
+              placeholder="A better shopping experience"
+            />
+          </div>
+
+          <TextAreaField
+            label="Company Description"
+            value={about.companyDescription}
+            onChange={(value) =>
+              updateAbout("companyDescription", value)
+            }
+            placeholder="Write about ROYS..."
+          />
+        </div>
+      </section>
+
+      {/* OUR STORY */}
+
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-5">
+          <div className="flex items-center gap-3">
+            <BookOpen className="text-primary" size={22} />
+            <h2 className="text-xl font-bold">Our Story</h2>
+          </div>
+
+          <InputField
+            label="Story Heading"
+            value={about.storyTitle}
+            onChange={(value) => updateAbout("storyTitle", value)}
+          />
+
+          <TextAreaField
+            label="Story Description"
+            value={about.storyDescription}
+            onChange={(value) =>
+              updateAbout("storyDescription", value)
+            }
+          />
+        </div>
+      </section>
+
+      {/* OUR MISSION */}
+
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-5">
+          <div className="flex items-center gap-3">
+            <Target className="text-primary" size={22} />
+            <h2 className="text-xl font-bold">Our Mission</h2>
+          </div>
+
+          <ImageUploader
+            image={about.missionImage}
+            field="missionImage"
+            label="Mission Image"
+            uploading={uploading}
+            onImageChange={handleImageChange}
+            onRemove={removeImage}
+          />
+
+          <InputField
+            label="Mission Heading"
+            value={about.missionTitle}
+            onChange={(value) => updateAbout("missionTitle", value)}
+          />
+
+          <TextAreaField
+            label="Mission Description"
+            value={about.missionDescription}
+            onChange={(value) =>
+              updateAbout("missionDescription", value)
+            }
+          />
+        </div>
+      </section>
+
+      {/* OUR VISION */}
+
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-5">
+          <div className="flex items-center gap-3">
+            <Eye className="text-primary" size={22} />
+            <h2 className="text-xl font-bold">Our Vision</h2>
+          </div>
+
+          <ImageUploader
+            image={about.visionImage}
+            field="visionImage"
+            label="Vision Image"
+            uploading={uploading}
+            onImageChange={handleImageChange}
+            onRemove={removeImage}
+          />
+
+          <InputField
+            label="Vision Heading"
+            value={about.visionTitle}
+            onChange={(value) => updateAbout("visionTitle", value)}
+          />
+
+          <TextAreaField
+            label="Vision Description"
+            value={about.visionDescription}
+            onChange={(value) =>
+              updateAbout("visionDescription", value)
+            }
+          />
+        </div>
+      </section>
+
+      {/* SAVE COMPANY INFORMATION */}
+
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => void saveAbout()}
+          disabled={saving || uploading !== ""}
+          className="btn btn-primary min-w-48"
+        >
+          {saving ? (
+            <Loader2 className="animate-spin" size={18} />
+          ) : (
+            <Save size={18} />
+          )}
+
+          Save Company Information
+        </button>
       </div>
-    </div>
-  );
-}
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder = "",
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  type?: string;
-}) {
-  return (
-    <label className={labelClass}>
-      {label}
+      {/* ===================================================
+          TEAM MEMBERS
+      =================================================== */}
 
-      <input
-        type={type}
-        min={type === "number" ? 0 : undefined}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={inputClass}
-      />
-    </label>
-  );
-}
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Users className="text-primary" size={23} />
 
-function TextArea({
-  label,
-  value,
-  onChange,
-  placeholder = "",
-  rows = 5,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  rows?: number;
-}) {
-  return (
-    <label className={labelClass}>
-      {label}
+              <div>
+                <h2 className="text-xl font-bold">Company Members</h2>
 
-      <textarea
-        rows={rows}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className={`${inputClass} resize-y`}
-      />
-    </label>
-  );
-}
+                <p className="text-sm text-base-content/60">
+                  Manage your company team.
+                </p>
+              </div>
+            </div>
 
-function Toggle({
-  label,
-  checked,
-  onChange,
-}: {
-  label: string;
-  checked: boolean;
-  onChange: (value: boolean) => void;
-}) {
-  return (
-    <div className="mt-5 flex items-center justify-between rounded-xl bg-gray-50 p-4">
-      <span className="text-sm font-semibold text-gray-700">
-        {label}
-      </span>
+            <button
+              type="button"
+              onClick={openNewMember}
+              className="btn btn-primary btn-sm"
+            >
+              <Plus size={17} />
+              Add Member
+            </button>
+          </div>
 
-      <button
-        type="button"
-        role="switch"
-        aria-checked={checked}
-        onClick={() => onChange(!checked)}
-        className={`relative h-6 w-11 rounded-full transition ${
-          checked ? "bg-[#7f1d2d]" : "bg-gray-300"
-        }`}
-      >
-        <span
-          className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${
-            checked ? "left-6" : "left-1"
-          }`}
-        />
-      </button>
+          {about.teamMembers.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-base-300 py-12 text-center">
+              <Users
+                className="mx-auto mb-3 text-base-content/40"
+                size={35}
+              />
+
+              <p className="font-semibold">
+                No team members added yet.
+              </p>
+
+              <p className="mt-1 text-sm text-base-content/50">
+                Add your first company member.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {about.teamMembers.map((member) => (
+                <div
+                  key={member.id}
+                  className="overflow-hidden rounded-xl border border-base-300"
+                >
+                  {member.imageUrl ? (
+                    <img
+                      src={member.imageUrl}
+                      alt={member.name}
+                      className="h-52 w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-52 items-center justify-center bg-base-200">
+                      <Users
+                        size={40}
+                        className="text-base-content/30"
+                      />
+                    </div>
+                  )}
+
+                  <div className="space-y-2 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <h3 className="font-bold">{member.name}</h3>
+
+                      <span
+                        className={`badge ${
+                          member.isActive
+                            ? "badge-success"
+                            : "badge-ghost"
+                        }`}
+                      >
+                        {member.isActive ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+
+                    <p className="text-sm text-primary">
+                      {member.designation}
+                    </p>
+
+                    {member.email && (
+                      <p className="flex items-center gap-2 break-all text-xs text-base-content/60">
+                        <Mail size={14} />
+                        {member.email}
+                      </p>
+                    )}
+
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditMember(member)}
+                        className="btn btn-outline btn-sm flex-1"
+                      >
+                        <Pencil size={14} />
+                        Edit
+                      </button>
+
+                      <button
+                        type="button"
+                        disabled={deleting === member.id}
+                        onClick={() => void deleteMember(member.id)}
+                        className="btn btn-error btn-outline btn-sm"
+                      >
+                        {deleting === member.id ? (
+                          <Loader2
+                            className="animate-spin"
+                            size={15}
+                          />
+                        ) : (
+                          <Trash2 size={15} />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ===================================================
+          GOALS
+      =================================================== */}
+
+      <section className="card border border-base-300 bg-base-100 shadow-sm">
+        <div className="card-body space-y-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Sparkles className="text-primary" size={23} />
+
+              <div>
+                <h2 className="text-xl font-bold">Our Goals</h2>
+
+                <p className="text-sm text-base-content/60">
+                  Manage company goals and descriptions.
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={openNewGoal}
+              className="btn btn-primary btn-sm"
+            >
+              <Plus size={17} />
+              Add Goal
+            </button>
+          </div>
+
+          {about.features.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-base-300 py-12 text-center">
+              <Target
+                className="mx-auto mb-3 text-base-content/40"
+                size={35}
+              />
+
+              <p className="font-semibold">
+                No goals added yet.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2">
+              {about.features.map((goal) => (
+                <div
+                  key={goal.id}
+                  className="rounded-xl border border-base-300 p-5"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <span className="rounded-lg bg-primary/10 p-2 text-primary">
+                      <Target size={20} />
+                    </span>
+
+                    <span
+                      className={`badge ${
+                        goal.isActive
+                          ? "badge-success"
+                          : "badge-ghost"
+                      }`}
+                    >
+                      {goal.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </div>
+
+                  <h3 className="font-bold">{goal.title}</h3>
+
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-base-content/60">
+                    {goal.description}
+                  </p>
+
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => openEditGoal(goal)}
+                      className="btn btn-outline btn-sm flex-1"
+                    >
+                      <Pencil size={14} />
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={deleting === goal.id}
+                      onClick={() => void deleteGoal(goal.id)}
+                      className="btn btn-error btn-outline btn-sm"
+                    >
+                      {deleting === goal.id ? (
+                        <Loader2
+                          className="animate-spin"
+                          size={15}
+                        />
+                      ) : (
+                        <Trash2 size={15} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* ===================================================
+          MEMBER MODAL
+      =================================================== */}
+
+      {memberModal && (
+        <div className="modal modal-open">
+          <div className="modal-box max-h-[90vh] max-w-2xl overflow-y-auto">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-xl font-bold">
+                {editingMember
+                  ? "Edit Member"
+                  : "Add Company Member"}
+              </h3>
+
+              <button
+                type="button"
+                onClick={() => setMemberModal(false)}
+                className="btn btn-circle btn-ghost btn-sm"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <ImageUploader
+                image={memberForm.imageUrl}
+                field="memberImage"
+                label="Member Photo"
+                member
+                uploading={uploading}
+                onImageChange={handleImageChange}
+                onRemove={removeImage}
+              />
+
+              <InputField
+                label="Full Name"
+                value={memberForm.name}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    name: value,
+                  }))
+                }
+                placeholder="Enter member name"
+              />
+
+              <InputField
+                label="Designation"
+                value={memberForm.designation}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    designation: value,
+                  }))
+                }
+                placeholder="e.g. Chief Executive Officer"
+              />
+
+              <InputField
+                label="Email Address"
+                type="email"
+                value={memberForm.email}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    email: value,
+                  }))
+                }
+                placeholder="member@example.com"
+              />
+
+              <div className="form-control gap-2">
+                <label className="text-sm font-semibold">
+                  Member Category
+                </label>
+
+                <select
+                  className="select select-bordered"
+                  value={memberForm.roleType}
+                  onChange={(event) =>
+                    setMemberForm((prev) => ({
+                      ...prev,
+                      roleType: event.target.value,
+                    }))
+                  }
+                >
+                  <option value="LEADERSHIP">Leadership</option>
+                  <option value="GENERAL">General</option>
+                </select>
+              </div>
+
+              <TextAreaField
+                label="Member Bio"
+                value={memberForm.bio}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    bio: value,
+                  }))
+                }
+              />
+
+              <InputField
+                label="Facebook URL"
+                value={memberForm.facebookUrl}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    facebookUrl: value,
+                  }))
+                }
+              />
+
+              <InputField
+                label="LinkedIn URL"
+                value={memberForm.linkedinUrl}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    linkedinUrl: value,
+                  }))
+                }
+              />
+
+              <InputField
+                label="Instagram URL"
+                value={memberForm.instagramUrl}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    instagramUrl: value,
+                  }))
+                }
+              />
+
+              <InputField
+                label="Display Order"
+                type="number"
+                value={String(memberForm.displayOrder)}
+                onChange={(value) =>
+                  setMemberForm((prev) => ({
+                    ...prev,
+                    displayOrder: Number(value) || 0,
+                  }))
+                }
+              />
+
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-primary"
+                  checked={memberForm.isActive}
+                  onChange={(event) =>
+                    setMemberForm((prev) => ({
+                      ...prev,
+                      isActive: event.target.checked,
+                    }))
+                  }
+                />
+
+                <span className="text-sm font-medium">
+                  Show this member publicly
+                </span>
+              </label>
+            </div>
+
+            <div className="modal-action">
+              <button
+                type="button"
+                onClick={() => setMemberModal(false)}
+                className="btn btn-ghost"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void saveMember()}
+                disabled={savingMember || uploading !== ""}
+                className="btn btn-primary"
+              >
+                {savingMember ? (
+                  <Loader2 className="animate-spin" size={17} />
+                ) : (
+                  <Save size={17} />
+                )}
+
+                Save Member
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ===================================================
+          GOAL MODAL
+      =================================================== */}
+
+      {goalModal && (
+        <div className="modal modal-open">
+          <div className="modal-box">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-xl font-bold">
+                {editingGoal ? "Edit Goal" : "Add New Goal"}
+              </h3>
+
+              <button
+                type="button"
+                onClick={() => setGoalModal(false)}
+                className="btn btn-circle btn-ghost btn-sm"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <InputField
+                label="Goal Title"
+                value={goalForm.title}
+                onChange={(value) =>
+                  setGoalForm((prev) => ({
+                    ...prev,
+                    title: value,
+                  }))
+                }
+                placeholder="e.g. Customer Satisfaction"
+              />
+
+              <TextAreaField
+                label="Goal Description"
+                value={goalForm.description}
+                onChange={(value) =>
+                  setGoalForm((prev) => ({
+                    ...prev,
+                    description: value,
+                  }))
+                }
+                placeholder="Describe your company goal..."
+              />
+
+              <InputField
+                label="Icon Name"
+                value={goalForm.icon}
+                onChange={(value) =>
+                  setGoalForm((prev) => ({
+                    ...prev,
+                    icon: value,
+                  }))
+                }
+                placeholder="target"
+              />
+
+              <InputField
+                label="Display Order"
+                type="number"
+                value={String(goalForm.displayOrder)}
+                onChange={(value) =>
+                  setGoalForm((prev) => ({
+                    ...prev,
+                    displayOrder: Number(value) || 0,
+                  }))
+                }
+              />
+
+              <label className="flex cursor-pointer items-center gap-3">
+                <input
+                  type="checkbox"
+                  className="checkbox checkbox-primary"
+                  checked={goalForm.isActive}
+                  onChange={(event) =>
+                    setGoalForm((prev) => ({
+                      ...prev,
+                      isActive: event.target.checked,
+                    }))
+                  }
+                />
+
+                <span className="text-sm font-medium">
+                  Show this goal publicly
+                </span>
+              </label>
+            </div>
+
+            <div className="modal-action">
+              <button
+                type="button"
+                onClick={() => setGoalModal(false)}
+                className="btn btn-ghost"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={() => void saveGoal()}
+                disabled={savingGoal}
+                className="btn btn-primary"
+              >
+                {savingGoal ? (
+                  <Loader2 className="animate-spin" size={17} />
+                ) : (
+                  <Save size={17} />
+                )}
+
+                Save Goal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
