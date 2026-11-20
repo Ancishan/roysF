@@ -23,10 +23,14 @@ import {
 // API CONFIGURATION
 // =====================================
 
-const API_URL =
-  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000")
-    .replace(/\/+$/, "")
-    .replace(/\/api$/i, "") + "/api";
+const API_BASE_URL = (
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+)
+  .trim()
+  .replace(/\/+$/, "")
+  .replace(/(?:\/api)+$/i, "");
+
+const API_URL = `${API_BASE_URL}/api`;
 
 // =====================================
 // TYPES
@@ -58,7 +62,6 @@ type FilterType = "ALL" | "PENDING" | "APPROVED";
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -87,19 +90,19 @@ export default function AdminReviewsPage() {
   }, []);
 
   // =====================================
-  // GET ALL REVIEWS
+  // API REQUEST
+  // Only fetches and returns data.
+  // No setState inside this function.
   // =====================================
 
-  const fetchReviews = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-
+  const requestReviews = useCallback(
+    async (signal?: AbortSignal): Promise<Review[]> => {
       const response = await fetch(`${API_URL}/reviews`, {
         method: "GET",
         headers: getHeaders(),
         credentials: "include",
         cache: "no-store",
+        signal,
       });
 
       const result = await response.json();
@@ -110,28 +113,70 @@ export default function AdminReviewsPage() {
         );
       }
 
-      setReviews(Array.isArray(result.data) ? result.data : []);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong"
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [getHeaders]);
+      return Array.isArray(result.data) ? result.data : [];
+    },
+    [getHeaders]
+  );
 
   // =====================================
   // INITIAL FETCH
   // =====================================
 
   useEffect(() => {
-    fetchReviews();
-  }, [fetchReviews]);
+    const controller = new AbortController();
+
+    requestReviews(controller.signal)
+      .then((data) => {
+        if (controller.signal.aborted) return;
+
+        setReviews(data);
+        setError("");
+      })
+      .catch((err: unknown) => {
+        if (controller.signal.aborted) return;
+
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Failed to fetch reviews"
+        );
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      controller.abort();
+    };
+  }, [requestReviews]);
 
   // =====================================
-  // APPROVE / UNAPPROVE REVIEW
+  // REFRESH REVIEWS
+  // =====================================
+
+  const fetchReviews = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const data = await requestReviews();
+
+      setReviews(data);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to fetch reviews"
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // =====================================
+  // APPROVE / UNAPPROVE
   // =====================================
 
   const handleApproval = async (review: Review) => {
@@ -340,7 +385,6 @@ export default function AdminReviewsPage() {
       {/* HEADER */}
 
       <div className="mb-8 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
-
         <div>
           <div className="mb-2 flex items-center gap-2">
             <ShieldCheck
@@ -371,7 +415,6 @@ export default function AdminReviewsPage() {
             size={17}
             className={loading ? "animate-spin" : ""}
           />
-
           Refresh Reviews
         </button>
       </div>
@@ -397,30 +440,22 @@ export default function AdminReviewsPage() {
 
       <div className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
 
-        {/* TOTAL */}
-
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500">
                 Total Reviews
               </p>
-
               <h2 className="mt-2 text-3xl font-bold text-gray-900">
                 {totalReviews}
               </h2>
             </div>
 
             <div className="rounded-xl bg-purple-50 p-3">
-              <MessageSquare
-                size={23}
-                className="text-purple-600"
-              />
+              <MessageSquare size={23} className="text-purple-600" />
             </div>
           </div>
         </div>
-
-        {/* APPROVED */}
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
@@ -428,22 +463,16 @@ export default function AdminReviewsPage() {
               <p className="text-sm font-medium text-gray-500">
                 Approved Reviews
               </p>
-
               <h2 className="mt-2 text-3xl font-bold text-green-600">
                 {approvedReviews}
               </h2>
             </div>
 
             <div className="rounded-xl bg-green-50 p-3">
-              <CheckCircle2
-                size={23}
-                className="text-green-600"
-              />
+              <CheckCircle2 size={23} className="text-green-600" />
             </div>
           </div>
         </div>
-
-        {/* PENDING */}
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
@@ -451,22 +480,16 @@ export default function AdminReviewsPage() {
               <p className="text-sm font-medium text-gray-500">
                 Pending Reviews
               </p>
-
               <h2 className="mt-2 text-3xl font-bold text-amber-600">
                 {pendingReviews}
               </h2>
             </div>
 
             <div className="rounded-xl bg-amber-50 p-3">
-              <Clock3
-                size={23}
-                className="text-amber-600"
-              />
+              <Clock3 size={23} className="text-amber-600" />
             </div>
           </div>
         </div>
-
-        {/* AVERAGE RATING */}
 
         <div className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
@@ -474,7 +497,6 @@ export default function AdminReviewsPage() {
               <p className="text-sm font-medium text-gray-500">
                 Average Rating
               </p>
-
               <h2 className="mt-2 text-3xl font-bold text-gray-900">
                 {averageRating}
                 <span className="ml-1 text-base text-gray-400">
@@ -491,16 +513,16 @@ export default function AdminReviewsPage() {
             </div>
           </div>
         </div>
+
       </div>
 
       {/* REVIEW MANAGEMENT */}
 
       <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm">
 
-        {/* SEARCH & FILTER HEADER */}
+        {/* SEARCH & FILTER */}
 
         <div className="border-b border-gray-100 p-5">
-
           <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
 
             <div>
@@ -514,8 +536,6 @@ export default function AdminReviewsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
-
-              {/* SEARCH */}
 
               <div className="relative">
                 <Search
@@ -541,8 +561,6 @@ export default function AdminReviewsPage() {
                   </button>
                 )}
               </div>
-
-              {/* FILTER */}
 
               <select
                 value={filter}
@@ -575,12 +593,8 @@ export default function AdminReviewsPage() {
           </div>
         ) : filteredReviews.length === 0 ? (
           <div className="flex min-h-72 flex-col items-center justify-center px-5 text-center">
-
             <div className="mb-4 rounded-full bg-gray-100 p-5">
-              <MessageSquare
-                size={32}
-                className="text-gray-400"
-              />
+              <MessageSquare size={32} className="text-gray-400" />
             </div>
 
             <h3 className="text-lg font-bold text-gray-800">
@@ -607,10 +621,9 @@ export default function AdminReviewsPage() {
                   key={review.id}
                   className="p-5 transition hover:bg-gray-50/70 sm:p-6"
                 >
-
-                  {/* CUSTOMER INFORMATION */}
-
                   <div className="flex flex-col justify-between gap-4 lg:flex-row">
+
+                    {/* CUSTOMER DETAILS */}
 
                     <div className="min-w-0 flex-1">
 
@@ -630,8 +643,6 @@ export default function AdminReviewsPage() {
                           </p>
                         </div>
 
-                        {/* STATUS */}
-
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-semibold ${
                             review.isApproved
@@ -647,7 +658,6 @@ export default function AdminReviewsPage() {
                       {/* PRODUCT */}
 
                       <div className="mt-5 flex flex-wrap items-center gap-2 text-sm text-gray-600">
-
                         <Package
                           size={16}
                           className="text-[#7f1d2d]"
@@ -660,7 +670,6 @@ export default function AdminReviewsPage() {
                         <span className="font-semibold text-gray-800">
                           {productName}
                         </span>
-
                       </div>
 
                       {/* RATING */}
@@ -691,8 +700,6 @@ export default function AdminReviewsPage() {
 
                     <div className="flex shrink-0 flex-row items-start gap-2 lg:flex-col">
 
-                      {/* APPROVE / UNAPPROVE */}
-
                       <button
                         onClick={() => handleApproval(review)}
                         disabled={
@@ -721,8 +728,6 @@ export default function AdminReviewsPage() {
                             : "Approve"}
                       </button>
 
-                      {/* DELETE */}
-
                       <button
                         onClick={() => handleDelete(review.id)}
                         disabled={
@@ -746,7 +751,6 @@ export default function AdminReviewsPage() {
                       </button>
 
                     </div>
-
                   </div>
                 </div>
               );
@@ -759,7 +763,6 @@ export default function AdminReviewsPage() {
 
         {!loading && filteredReviews.length > 0 && (
           <div className="border-t border-gray-100 bg-gray-50 px-5 py-4">
-
             <p className="text-sm text-gray-500">
               Showing{" "}
               <span className="font-bold text-gray-800">
@@ -771,7 +774,6 @@ export default function AdminReviewsPage() {
               </span>{" "}
               reviews
             </p>
-
           </div>
         )}
 
