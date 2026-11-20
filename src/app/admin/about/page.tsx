@@ -1,8 +1,8 @@
-
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
 import type { ChangeEvent } from "react";
+import Image from "next/image";
 
 import {
   Save,
@@ -27,11 +27,10 @@ import {
    API CONFIGURATION
 ========================================================= */
 
-const API_BASE = (
-  process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-)
-  .replace(/\/+$/, "")
-  .replace(/\/api$/, "") + "/api";
+const API_BASE =
+  (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000")
+    .replace(/\/+$/, "")
+    .replace(/\/api$/, "") + "/api";
 
 /* =========================================================
    TYPES
@@ -85,10 +84,7 @@ type AboutImageField =
   | "visionImage"
   | "memberImage";
 
-type AboutEditableField = Exclude<
-  keyof AboutData,
-  "teamMembers" | "features"
->;
+type AboutEditableField = Exclude<keyof AboutData, "teamMembers" | "features">;
 
 type MemberForm = {
   name: string;
@@ -168,7 +164,7 @@ const emptyGoal: GoalForm = {
 ========================================================= */
 
 async function readResponse<T = unknown>(
-  response: Response
+  response: Response,
 ): Promise<ApiResponse<T>> {
   const result = (await response.json().catch(() => ({}))) as ApiResponse<T>;
 
@@ -258,7 +254,7 @@ type ImageUploaderProps = {
   member?: boolean;
   onImageChange: (
     event: ChangeEvent<HTMLInputElement>,
-    field: AboutImageField
+    field: AboutImageField,
   ) => void;
   onRemove: (field: AboutImageField) => void;
 };
@@ -276,20 +272,19 @@ function ImageUploader({
 
   return (
     <div className="space-y-2">
-      <label className="text-sm font-semibold text-base-content">
-        {label}
-      </label>
+      <label className="text-sm font-semibold text-base-content">{label}</label>
 
-      <div className="relative overflow-hidden rounded-xl border border-base-300 bg-base-200">
+      <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
         {image ? (
           <div className="relative">
-            <img
+            <Image
               src={image}
               alt={label}
+              width={800}
+              height={500}
+              unoptimized
               className={
-                member
-                  ? "h-48 w-full object-cover"
-                  : "h-56 w-full object-cover"
+                member ? "h-48 w-full object-cover" : "h-56 w-full object-cover"
               }
             />
 
@@ -313,7 +308,7 @@ function ImageUploader({
             )}
           </div>
         ) : (
-          <label className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 text-base-content/50 transition hover:bg-base-300">
+          <label className="flex h-48 cursor-pointer flex-col items-center justify-center gap-3 text-slate-500 transition hover:bg-base-300">
             {isUploading ? (
               <Loader2 className="animate-spin" size={30} />
             ) : (
@@ -338,13 +333,12 @@ function ImageUploader({
 
         {image && (
           <label
-            className={`flex cursor-pointer items-center justify-center gap-2 border-t border-base-300 p-3 text-sm font-semibold transition hover:bg-base-300 ${
+            className={`flex cursor-pointer items-center justify-center gap-2 border-t border-slate-200 p-3 text-sm font-semibold transition hover:bg-base-300 ${
               uploading !== "" ? "pointer-events-none opacity-50" : ""
             }`}
           >
             <Upload size={16} />
             Change Image
-
             <input
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
@@ -401,7 +395,7 @@ export default function AdminAboutPage() {
   const request = useCallback(
     async <T = unknown,>(
       path: string,
-      options: RequestInit = {}
+      options: RequestInit = {},
     ): Promise<ApiResponse<T>> => {
       const headers = new Headers(options.headers);
 
@@ -417,7 +411,7 @@ export default function AdminAboutPage() {
 
       return readResponse<T>(response);
     },
-    []
+    [],
   );
 
   /* -------------------------------------------------------
@@ -445,7 +439,7 @@ export default function AdminAboutPage() {
       }
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to load About page."
+        err instanceof Error ? err.message : "Failed to load About page.",
       );
     } finally {
       setLoading(false);
@@ -494,7 +488,7 @@ export default function AdminAboutPage() {
 
   const handleImageChange = async (
     event: ChangeEvent<HTMLInputElement>,
-    field: AboutImageField
+    field: AboutImageField,
   ) => {
     const file = event.target.files?.[0];
 
@@ -524,9 +518,7 @@ export default function AdminAboutPage() {
 
       setMessage("Image uploaded successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Image upload failed."
-      );
+      setError(err instanceof Error ? err.message : "Image upload failed.");
     } finally {
       setUploading("");
     }
@@ -555,10 +547,7 @@ export default function AdminAboutPage() {
      UPDATE ABOUT FIELD
   ------------------------------------------------------- */
 
-  const updateAbout = (
-    field: AboutEditableField,
-    value: string | boolean
-  ) => {
+  const updateAbout = (field: AboutEditableField, value: string | boolean) => {
     setAbout((prev) => ({
       ...prev,
       [field]: value,
@@ -608,7 +597,7 @@ export default function AdminAboutPage() {
       setMessage("Company information saved successfully.");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to save information."
+        err instanceof Error ? err.message : "Failed to save information.",
       );
     } finally {
       setSaving(false);
@@ -666,7 +655,7 @@ export default function AdminAboutPage() {
         {
           method: editingMember ? "PATCH" : "POST",
           body: JSON.stringify(memberForm),
-        }
+        },
       );
 
       if (!result.data) {
@@ -679,10 +668,10 @@ export default function AdminAboutPage() {
         ...prev,
         teamMembers: editingMember
           ? prev.teamMembers.map((item) =>
-              item.id === editingMember ? member : item
+              item.id === editingMember ? member : item,
             )
           : [...prev.teamMembers, member].sort(
-              (a, b) => a.displayOrder - b.displayOrder
+              (a, b) => a.displayOrder - b.displayOrder,
             ),
       }));
 
@@ -693,7 +682,7 @@ export default function AdminAboutPage() {
       setMessage("Team member saved successfully.");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "Failed to save team member."
+        err instanceof Error ? err.message : "Failed to save team member.",
       );
     } finally {
       setSavingMember(false);
@@ -720,16 +709,12 @@ export default function AdminAboutPage() {
 
       setAbout((prev) => ({
         ...prev,
-        teamMembers: prev.teamMembers.filter(
-          (member) => member.id !== id
-        ),
+        teamMembers: prev.teamMembers.filter((member) => member.id !== id),
       }));
 
       setMessage("Team member deleted successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete member."
-      );
+      setError(err instanceof Error ? err.message : "Failed to delete member.");
     } finally {
       setDeleting("");
     }
@@ -780,7 +765,7 @@ export default function AdminAboutPage() {
         {
           method: editingGoal ? "PATCH" : "POST",
           body: JSON.stringify(goalForm),
-        }
+        },
       );
 
       if (!result.data) {
@@ -792,11 +777,9 @@ export default function AdminAboutPage() {
       setAbout((prev) => ({
         ...prev,
         features: editingGoal
-          ? prev.features.map((item) =>
-              item.id === editingGoal ? goal : item
-            )
+          ? prev.features.map((item) => (item.id === editingGoal ? goal : item))
           : [...prev.features, goal].sort(
-              (a, b) => a.displayOrder - b.displayOrder
+              (a, b) => a.displayOrder - b.displayOrder,
             ),
       }));
 
@@ -806,9 +789,7 @@ export default function AdminAboutPage() {
 
       setMessage("Goal saved successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to save goal."
-      );
+      setError(err instanceof Error ? err.message : "Failed to save goal.");
     } finally {
       setSavingGoal(false);
     }
@@ -839,9 +820,7 @@ export default function AdminAboutPage() {
 
       setMessage("Goal deleted successfully.");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to delete goal."
-      );
+      setError(err instanceof Error ? err.message : "Failed to delete goal.");
     } finally {
       setDeleting("");
     }
@@ -864,13 +843,12 @@ export default function AdminAboutPage() {
   ======================================================= */
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 p-4 md:p-6 lg:p-8">
-
+    <div className="btn border-[#7f1d2d] bg-[#7f1d2d] text-white hover:border-[#641725] hover:bg-[#641725]">
       {/* HEADER */}
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <div className="mb-2 flex items-center gap-2 text-sm text-base-content/50">
+          <div className="mb-2 flex items-center gap-2 text-sm text-slate-500">
             <Building2 size={16} />
             Admin / Content Management / About
           </div>
@@ -936,7 +914,7 @@ export default function AdminAboutPage() {
 
       {/* PUBLIC PAGE STATUS */}
 
-      <div className="card border border-base-300 bg-base-100 shadow-sm">
+      <div className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body flex-row items-center justify-between">
           <div>
             <h3 className="font-bold">Public About Page</h3>
@@ -965,9 +943,9 @@ export default function AdminAboutPage() {
 
       {/* COMPANY HERO */}
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body space-y-6">
-          <div className="flex items-center gap-3 border-b border-base-300 pb-4">
+          <div className="flex items-center gap-3 border-b border-slate-200 pb-4">
             <div className="rounded-lg bg-primary/10 p-3 text-primary">
               <Building2 size={22} />
             </div>
@@ -1009,9 +987,7 @@ export default function AdminAboutPage() {
           <TextAreaField
             label="Company Description"
             value={about.companyDescription}
-            onChange={(value) =>
-              updateAbout("companyDescription", value)
-            }
+            onChange={(value) => updateAbout("companyDescription", value)}
             placeholder="Write about ROYS..."
           />
         </div>
@@ -1019,7 +995,7 @@ export default function AdminAboutPage() {
 
       {/* OUR STORY */}
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body space-y-5">
           <div className="flex items-center gap-3">
             <BookOpen className="text-primary" size={22} />
@@ -1035,16 +1011,14 @@ export default function AdminAboutPage() {
           <TextAreaField
             label="Story Description"
             value={about.storyDescription}
-            onChange={(value) =>
-              updateAbout("storyDescription", value)
-            }
+            onChange={(value) => updateAbout("storyDescription", value)}
           />
         </div>
       </section>
 
       {/* OUR MISSION */}
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body space-y-5">
           <div className="flex items-center gap-3">
             <Target className="text-primary" size={22} />
@@ -1069,16 +1043,14 @@ export default function AdminAboutPage() {
           <TextAreaField
             label="Mission Description"
             value={about.missionDescription}
-            onChange={(value) =>
-              updateAbout("missionDescription", value)
-            }
+            onChange={(value) => updateAbout("missionDescription", value)}
           />
         </div>
       </section>
 
       {/* OUR VISION */}
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body space-y-5">
           <div className="flex items-center gap-3">
             <Eye className="text-primary" size={22} />
@@ -1103,9 +1075,7 @@ export default function AdminAboutPage() {
           <TextAreaField
             label="Vision Description"
             value={about.visionDescription}
-            onChange={(value) =>
-              updateAbout("visionDescription", value)
-            }
+            onChange={(value) => updateAbout("visionDescription", value)}
           />
         </div>
       </section>
@@ -1124,7 +1094,6 @@ export default function AdminAboutPage() {
           ) : (
             <Save size={18} />
           )}
-
           Save Company Information
         </button>
       </div>
@@ -1133,7 +1102,7 @@ export default function AdminAboutPage() {
           TEAM MEMBERS
       =================================================== */}
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1159,17 +1128,12 @@ export default function AdminAboutPage() {
           </div>
 
           {about.teamMembers.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-base-300 py-12 text-center">
-              <Users
-                className="mx-auto mb-3 text-base-content/40"
-                size={35}
-              />
+            <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
+              <Users className="mx-auto mb-3 text-base-content/40" size={35} />
 
-              <p className="font-semibold">
-                No team members added yet.
-              </p>
+              <p className="font-semibold">No team members added yet.</p>
 
-              <p className="mt-1 text-sm text-base-content/50">
+              <p className="mt-1 text-sm text-slate-500">
                 Add your first company member.
               </p>
             </div>
@@ -1178,20 +1142,20 @@ export default function AdminAboutPage() {
               {about.teamMembers.map((member) => (
                 <div
                   key={member.id}
-                  className="overflow-hidden rounded-xl border border-base-300"
+                  className="overflow-hidden rounded-xl border border-slate-200"
                 >
                   {member.imageUrl ? (
-                    <img
+                    <Image
                       src={member.imageUrl}
                       alt={member.name}
+                      width={600}
+                      height={400}
+                      unoptimized
                       className="h-52 w-full object-cover"
                     />
                   ) : (
-                    <div className="flex h-52 items-center justify-center bg-base-200">
-                      <Users
-                        size={40}
-                        className="text-base-content/30"
-                      />
+                    <div className="flex h-52 items-center justify-center bg-slate-50">
+                      <Users size={40} className="text-base-content/30" />
                     </div>
                   )}
 
@@ -1201,18 +1165,14 @@ export default function AdminAboutPage() {
 
                       <span
                         className={`badge ${
-                          member.isActive
-                            ? "badge-success"
-                            : "badge-ghost"
+                          member.isActive ? "badge-success" : "badge-ghost"
                         }`}
                       >
                         {member.isActive ? "Active" : "Inactive"}
                       </span>
                     </div>
 
-                    <p className="text-sm text-primary">
-                      {member.designation}
-                    </p>
+                    <p className="text-sm text-primary">{member.designation}</p>
 
                     {member.email && (
                       <p className="flex items-center gap-2 break-all text-xs text-base-content/60">
@@ -1238,10 +1198,7 @@ export default function AdminAboutPage() {
                         className="btn btn-error btn-outline btn-sm"
                       >
                         {deleting === member.id ? (
-                          <Loader2
-                            className="animate-spin"
-                            size={15}
-                          />
+                          <Loader2 className="animate-spin" size={15} />
                         ) : (
                           <Trash2 size={15} />
                         )}
@@ -1259,7 +1216,7 @@ export default function AdminAboutPage() {
           GOALS
       =================================================== */}
 
-      <section className="card border border-base-300 bg-base-100 shadow-sm">
+      <section className="card border border-slate-200 bg-white shadow-sm">
         <div className="card-body space-y-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -1285,22 +1242,17 @@ export default function AdminAboutPage() {
           </div>
 
           {about.features.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-base-300 py-12 text-center">
-              <Target
-                className="mx-auto mb-3 text-base-content/40"
-                size={35}
-              />
+            <div className="rounded-xl border border-dashed border-slate-200 py-12 text-center">
+              <Target className="mx-auto mb-3 text-base-content/40" size={35} />
 
-              <p className="font-semibold">
-                No goals added yet.
-              </p>
+              <p className="font-semibold">No goals added yet.</p>
             </div>
           ) : (
             <div className="grid gap-4 md:grid-cols-2">
               {about.features.map((goal) => (
                 <div
                   key={goal.id}
-                  className="rounded-xl border border-base-300 p-5"
+                  className="rounded-xl border border-slate-200 p-5"
                 >
                   <div className="mb-3 flex items-center justify-between">
                     <span className="rounded-lg bg-primary/10 p-2 text-primary">
@@ -1309,9 +1261,7 @@ export default function AdminAboutPage() {
 
                     <span
                       className={`badge ${
-                        goal.isActive
-                          ? "badge-success"
-                          : "badge-ghost"
+                        goal.isActive ? "badge-success" : "badge-ghost"
                       }`}
                     >
                       {goal.isActive ? "Active" : "Inactive"}
@@ -1341,10 +1291,7 @@ export default function AdminAboutPage() {
                       className="btn btn-error btn-outline btn-sm"
                     >
                       {deleting === goal.id ? (
-                        <Loader2
-                          className="animate-spin"
-                          size={15}
-                        />
+                        <Loader2 className="animate-spin" size={15} />
                       ) : (
                         <Trash2 size={15} />
                       )}
@@ -1366,9 +1313,7 @@ export default function AdminAboutPage() {
           <div className="modal-box max-h-[90vh] max-w-2xl overflow-y-auto">
             <div className="mb-5 flex items-center justify-between">
               <h3 className="text-xl font-bold">
-                {editingMember
-                  ? "Edit Member"
-                  : "Add Company Member"}
+                {editingMember ? "Edit Member" : "Add Company Member"}
               </h3>
 
               <button
@@ -1429,9 +1374,7 @@ export default function AdminAboutPage() {
               />
 
               <div className="form-control gap-2">
-                <label className="text-sm font-semibold">
-                  Member Category
-                </label>
+                <label className="text-sm font-semibold">Member Category</label>
 
                 <select
                   className="select select-bordered"
@@ -1543,7 +1486,6 @@ export default function AdminAboutPage() {
                 ) : (
                   <Save size={17} />
                 )}
-
                 Save Member
               </button>
             </div>
@@ -1660,7 +1602,6 @@ export default function AdminAboutPage() {
                 ) : (
                   <Save size={17} />
                 )}
-
                 Save Goal
               </button>
             </div>
