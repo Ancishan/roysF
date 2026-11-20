@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,10 +19,18 @@ import {
   X,
 } from "lucide-react";
 
+// =====================================
+// API CONFIGURATION
+// =====================================
+
 const API_URL =
   (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000")
     .replace(/\/+$/, "")
-    .replace(/\/api$/, "") + "/api";
+    .replace(/\/api$/i, "") + "/api";
+
+// =====================================
+// TYPES
+// =====================================
 
 type Review = {
   id: string;
@@ -43,8 +52,13 @@ type Review = {
 
 type FilterType = "ALL" | "PENDING" | "APPROVED";
 
+// =====================================
+// COMPONENT
+// =====================================
+
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -58,7 +72,7 @@ export default function AdminReviewsPage() {
   // AUTH HEADERS
   // =====================================
 
-  const getHeaders = (): HeadersInit => {
+  const getHeaders = useCallback((): HeadersInit => {
     const token =
       localStorage.getItem("adminToken") ||
       localStorage.getItem("accessToken") ||
@@ -70,7 +84,7 @@ export default function AdminReviewsPage() {
         ? { Authorization: `Bearer ${token}` }
         : {}),
     };
-  };
+  }, []);
 
   // =====================================
   // GET ALL REVIEWS
@@ -81,15 +95,12 @@ export default function AdminReviewsPage() {
       setLoading(true);
       setError("");
 
-      const response = await fetch(
-        `${API_URL}/api/reviews`,
-        {
-          method: "GET",
-          headers: getHeaders(),
-          credentials: "include",
-          cache: "no-store",
-        }
-      );
+      const response = await fetch(`${API_URL}/reviews`, {
+        method: "GET",
+        headers: getHeaders(),
+        credentials: "include",
+        cache: "no-store",
+      });
 
       const result = await response.json();
 
@@ -99,7 +110,7 @@ export default function AdminReviewsPage() {
         );
       }
 
-      setReviews(result.data || []);
+      setReviews(Array.isArray(result.data) ? result.data : []);
     } catch (err) {
       setError(
         err instanceof Error
@@ -109,7 +120,11 @@ export default function AdminReviewsPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [getHeaders]);
+
+  // =====================================
+  // INITIAL FETCH
+  // =====================================
 
   useEffect(() => {
     fetchReviews();
@@ -122,15 +137,18 @@ export default function AdminReviewsPage() {
   const handleApproval = async (review: Review) => {
     try {
       setUpdatingId(review.id);
+      setError("");
+
+      const newApprovalStatus = !review.isApproved;
 
       const response = await fetch(
-        `${API_URL}/api/reviews/${review.id}`,
+        `${API_URL}/reviews/${review.id}`,
         {
           method: "PATCH",
           headers: getHeaders(),
           credentials: "include",
           body: JSON.stringify({
-            isApproved: !review.isApproved,
+            isApproved: newApprovalStatus,
           }),
         }
       );
@@ -148,7 +166,7 @@ export default function AdminReviewsPage() {
           item.id === review.id
             ? {
                 ...item,
-                isApproved: !review.isApproved,
+                isApproved: newApprovalStatus,
               }
             : item
         )
@@ -177,9 +195,10 @@ export default function AdminReviewsPage() {
 
     try {
       setDeletingId(id);
+      setError("");
 
       const response = await fetch(
-        `${API_URL}/api/reviews/${id}`,
+        `${API_URL}/reviews/${id}`,
         {
           method: "DELETE",
           headers: getHeaders(),
@@ -252,7 +271,7 @@ export default function AdminReviewsPage() {
       ]
         .join(" ")
         .toLowerCase()
-        .includes(search.toLowerCase());
+        .includes(search.trim().toLowerCase());
 
       const filterMatch =
         filter === "ALL" ||
@@ -268,7 +287,13 @@ export default function AdminReviewsPage() {
   // =====================================
 
   const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString("en-GB", {
+    const parsedDate = new Date(date);
+
+    if (Number.isNaN(parsedDate.getTime())) {
+      return "Unknown date";
+    }
+
+    return parsedDate.toLocaleDateString("en-GB", {
       day: "2-digit",
       month: "short",
       year: "numeric",
@@ -346,6 +371,7 @@ export default function AdminReviewsPage() {
             size={17}
             className={loading ? "animate-spin" : ""}
           />
+
           Refresh Reviews
         </button>
       </div>
@@ -356,6 +382,14 @@ export default function AdminReviewsPage() {
         <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertCircle size={20} />
           <span>{error}</span>
+
+          <button
+            onClick={() => setError("")}
+            className="ml-auto"
+            aria-label="Close error"
+          >
+            <X size={17} />
+          </button>
         </div>
       )}
 
@@ -492,9 +526,7 @@ export default function AdminReviewsPage() {
                 <input
                   type="text"
                   value={search}
-                  onChange={(e) =>
-                    setSearch(e.target.value)
-                  }
+                  onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search reviews..."
                   className="w-full rounded-xl border border-gray-200 bg-gray-50 py-3 pl-10 pr-10 text-sm outline-none transition focus:border-[#7f1d2d] focus:bg-white sm:w-64"
                 />
@@ -503,6 +535,7 @@ export default function AdminReviewsPage() {
                   <button
                     onClick={() => setSearch("")}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                    aria-label="Clear search"
                   >
                     <X size={16} />
                   </button>
@@ -518,17 +551,9 @@ export default function AdminReviewsPage() {
                 }
                 className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-medium text-gray-700 outline-none focus:border-[#7f1d2d]"
               >
-                <option value="ALL">
-                  All Reviews
-                </option>
-
-                <option value="PENDING">
-                  Pending
-                </option>
-
-                <option value="APPROVED">
-                  Approved
-                </option>
+                <option value="ALL">All Reviews</option>
+                <option value="PENDING">Pending</option>
+                <option value="APPROVED">Approved</option>
               </select>
 
             </div>
@@ -572,7 +597,6 @@ export default function AdminReviewsPage() {
           <div className="divide-y divide-gray-100">
 
             {filteredReviews.map((review) => {
-
               const productName =
                 review.product?.name ||
                 review.product?.title ||
@@ -615,9 +639,7 @@ export default function AdminReviewsPage() {
                               : "bg-amber-100 text-amber-700"
                           }`}
                         >
-                          {review.isApproved
-                            ? "Approved"
-                            : "Pending"}
+                          {review.isApproved ? "Approved" : "Pending"}
                         </span>
 
                       </div>
@@ -650,20 +672,17 @@ export default function AdminReviewsPage() {
                       {/* COMMENT */}
 
                       <div className="mt-4 rounded-xl bg-gray-50 p-4">
-
                         <p className="text-sm leading-7 text-gray-700">
                           {review.comment?.trim()
                             ? review.comment
                             : "No comment provided."}
                         </p>
-
                       </div>
 
                       {/* DATE */}
 
                       <p className="mt-3 text-xs text-gray-400">
-                        Submitted on{" "}
-                        {formatDate(review.createdAt)}
+                        Submitted on {formatDate(review.createdAt)}
                       </p>
 
                     </div>
@@ -675,9 +694,7 @@ export default function AdminReviewsPage() {
                       {/* APPROVE / UNAPPROVE */}
 
                       <button
-                        onClick={() =>
-                          handleApproval(review)
-                        }
+                        onClick={() => handleApproval(review)}
                         disabled={
                           updatingId === review.id ||
                           deletingId === review.id
@@ -707,9 +724,7 @@ export default function AdminReviewsPage() {
                       {/* DELETE */}
 
                       <button
-                        onClick={() =>
-                          handleDelete(review.id)
-                        }
+                        onClick={() => handleDelete(review.id)}
                         disabled={
                           deletingId === review.id ||
                           updatingId === review.id
@@ -733,7 +748,6 @@ export default function AdminReviewsPage() {
                     </div>
 
                   </div>
-
                 </div>
               );
             })}
