@@ -24,9 +24,6 @@ import {
   Sparkles,
 } from "lucide-react";
 
-/* =========================================================
-   API CONFIGURATION
-========================================================= */
 
 const API_BASE =
   (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000")
